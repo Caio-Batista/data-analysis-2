@@ -86,3 +86,11 @@ graduados.model.input <- graduados.clean %>%
 
 head(graduados.model.input)
 View(graduados.model.input)
+```
+
+
+TODO (Caio)
+
+Pegar os dados de cada uma das disciplinas em variáveis, aplicar em uma regressão linear e depois sumarizar 
+
+
