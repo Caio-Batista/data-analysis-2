@@ -89,8 +89,51 @@ View(graduados.model.input)
 ```
 
 
-TODO (Caio)
 
-Pegar os dados de cada uma das disciplinas em variáveis, aplicar em uma regressão linear e depois sumarizar 
+Pegamos os dados de cada uma das disciplinas em variáveis 
+
+```{r}
+#primeiro periodo
+CI <- graduados.model.input$Cálculo.Diferencial.e.Integral.I
+AV <- graduados.model.input$Álgebra.Vetorial.e.Geometria.Analítica
+IC <- graduados.model.input$Introdução.à.Computação  
+LPI <- graduados.model.input$Laboratório.de.Programação.I
+PI <- graduados.model.input$Programação.I
+LPT <- graduados.model.input$Leitura.e.Produção.de.Textos
+  
+#segundo periodo
+
+TG <- graduados.model.input$Teoria.dos.Grafos    
+PII <- graduados.model.input$Programação.II  
+LPII <- graduados.model.input$Laboratório.de.Programação.II
+CII <- graduados.model.input$Cálculo.Diferencial.e.Integral.II  
+FFC <- graduados.model.input$Fundamentos.de.Física.Clássica   
+MD <- graduados.model.input$Matemática.Discreta 
 
 
+  
+```
+
+Regressão para o primeiro período
+
+```{r}
+
+mycra <- lm(cra~CI + AV+ IC + PI + LPI + LPT, graduados.model.input)
+summary(mycra)
+
+a <- plot(mycra)
+abline(a)
+
+  
+```
+
+
+Regressão para o segundo periodo
+
+
+```{r}
+
+mycra <- lm(cra~CI + AV+ IC + LPI + PI + LPT, graduados.model.input)
+summary(mycra)
+  
+```
