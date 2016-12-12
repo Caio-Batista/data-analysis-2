@@ -118,11 +118,9 @@ Regressão para o primeiro período
 
 ```{r}
 
-mycra <- lm(cra~CI + AV+ IC + PI + LPI + LPT, graduados.model.input)
-summary(mycra)
-
-a <- plot(mycra)
-abline(a)
+mycra1 <- lm(cra~CI + AV+ IC + PI + LPI + LPT, graduados.model.input)
+summary(mycra1)
+plot(mycra1)
 
   
 ```
@@ -133,7 +131,77 @@ Regressão para o segundo periodo
 
 ```{r}
 
-mycra <- lm(cra~CI + AV+ IC + LPI + PI + LPT, graduados.model.input)
-summary(mycra)
-  
+mycra2 <- lm(cra~CII + FFC + LPII  + PII + MD + TG, graduados.model.input)
+summary(mycra2)
+plot(mycra2)
+
 ```
+
+....
+
+
+Podemos então responder as perguntas agora.
+
+
+<h3>Um modelo de regressão múltipla com todas as variáveis é plausível para explicar a variação em y? Em que grau?</h3>
+A resposta é não, pois temos variáveis que são desprezíveis no modelo, que só acrescentam ruidos, como prodemos ver na sumarização dos dados tanto para o primeiro período como para o segundo. Em grau 4 se formos considerar as cadeiras relevantes dos dois períodos estudados.
+
+
+....
+
+
+<h3>Todas as variáveis são úteis para o modelo de regressão?</h3>
+Não, por exemplo Laboratório de Programação dois que tem um p-valor alto e contribui pouquíssimo para o resultado.
+
+
+....
+
+
+<h3>Se a resposta para a pergunta anterior foi não, construa um novo modelo sem essas variáveis e o compare ao modelo com todas as variáveis (e.g. em termos de R2 e RSE).</h3>
+
+Para somente o primeiro período temos:
+
+```{r}
+mycra1.best <- lm(cra~CI + AV+ IC, graduados.model.input)
+summary(mycra1.best)
+plot(mycra1.best)
+```
+
+Para somente o segundo período temos:
+```{r}
+mycra2.best <- lm(cra~MD, graduados.model.input)
+summary(mycra2.best)
+plot(mycra2.best)
+```
+
+Para os dois juntos:
+```{r}
+mycra3 <- lm(cra~ MD + CI + AV+ IC, graduados.model.input)
+summary(mycra3)
+plot(mycra3)
+```
+....
+
+
+<h3>Analise os plots de resíduos de cada variável e veja se algum (um ou mais) deles indica não aleatoriedade dos erros.</h3>
+Quando observamos principalmente o gráfico do segundo período, sem as disciplinas com o p-value elevado, podemos ver uma distribuição quase uniforme dos resíduos, justamente pela relevância do fator que é a disciplina que mais influencia no cra. Assim como podemos ver também para o primeiro período quando "aparamos" as variáveis de entrada para o modelo de regressão linear 
+
+
+....
+
+<h3>Que período consegue explicar melhor o desempenho final (primeiro ou segundo)?</h3>
+Pelos gráficos e principalmente pelo p-value podemos observar que mesmo o primeiro período possuindo mais cadeiras que influenciam o CRA, a principal cadeira que influencia se encontra no segundo período. Que é Matemática Discreta. Logo o segundo período é o que mais influencia.
+
+....
+
+<h3>Use o melhor modelo encontrado para predizer o seu próprio desempenho e compare a predição com o seu CRA atual. Comente o resultado.</h3>
+Para o meu caso teriamos que incluir Algebra Linear no segundo periodo, fazendo as variáveis assim
+```{r}
+
+AL <- graduados.model.input$Álgebra.Linear.I
+mycra4.best <- lm(cra~MD + AL, graduados.model.input)
+summary(mycra4.best)
+plot(mycra4.best)
+```
+
+O que mostra uma concentração grande, principalmente entre 7 e 8,5. Um resultado conciso já que meu CRA é 7,9 e está dentro desse intervalo. 
