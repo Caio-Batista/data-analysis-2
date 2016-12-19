@@ -1,0 +1,168 @@
+---
+title: "Lab01-parte2"
+author: "Caio Oliveira"
+date: "November 16, 2016"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+
+1) Podemos ver por esses dois gráficos das piores e melhores medianas/medias dos cursos, que o melhor é o curso de 'Direito - M' e o que pior é 'Estatística - D' 
+
+```{r data}
+library(plyr)
+library(dplyr)
+library(ggplot2)
+require(gridExtra)
+
+ 
+data = read.csv(file="/home/caio/Desktop/alunosUFCGAnon.csv", encoding="UTF-8")
+
+
+a <- data.frame(data$Media_Disciplina, data$Nome_Curso)
+a <- na.omit(a)
+
+colnames(a)[1] <- "medias"
+colnames(a)[2] <- "curso"
+
+top5.medias.por.curso <- a %>%
+  arrange((medias)) %>%
+  group_by(curso) 
+ 
+
+means <-
+  top5.medias.por.curso %>%
+  #use the same groups as in the ggplot
+  group_by(curso) %>%
+  #calculate the means
+  summarise(mean = mean(medias)) 
+  
+
+#order the groups according to the order of the means
+medias.por.curso <- means$curso[order(means$mean)]
+piores.medias <- head(medias.por.curso)
+melhores.medias <- tail(medias.por.curso)
+
+
+piores.notas <- ggplot(top5.medias.por.curso, aes(curso,medias), size = 4) +
+  geom_boxplot(size = 0.5) +
+  #you just need to use scale_x_discrete with the limits argument
+  #to pass in details of the order of appearance for the boxplots
+  #in this case the order is the myorders vector
+  scale_x_discrete(limits=piores.medias)
+
+melhores.notas <- ggplot(top5.medias.por.curso, aes(curso,medias), size = 4) +
+  geom_boxplot(size = 0.5) +
+  #you just need to use scale_x_discrete with the limits argument
+  #to pass in details of the order of appearance for the boxplots
+  #in this case the order is the myorders vector
+  scale_x_discrete(limits=melhores.medias)
+
+grid.arrange(melhores.notas, piores.notas, ncol=1)
+
+
+```
+
+
+2) As melhores notas estão entre o 8 e 9 periodos.
+
+
+```{r}
+
+library(plyr)
+library(dplyr)
+library(ggplot2)
+require(gridExtra)
+
+
+data2 = read.csv(file="/home/caio/Desktop/alunosUFCGAnon.csv", encoding="UTF-8")
+
+
+b <- data.frame(data2$Media_Disciplina, data2$Nome_Curso, data2$Periodo_Relativo)
+b <- na.omit(b)
+
+colnames(b)[1] <- "medias"
+colnames(b)[2] <- "curso"
+colnames(b)[3] <- "periodo"
+
+
+alunos.computacao <- b %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D") %>%
+  group_by(periodo) %>%
+  summarise(medias.me = median(medias))
+
+
+ggplot(alunos.computacao, aes(x=periodo,y=medias.me)) + geom_bar(stat="identity")
+
+
+
+
+
+
+```
+
+
+3) Existe uma relação forte a partir do momento que analizamos os gráficos, são muito parecidos.
+
+
+```{r}
+
+library(plyr)
+library(dplyr)
+library(ggplot2)
+require(gridExtra)
+
+
+data2 = read.csv(file="/home/caio/Desktop/alunosUFCGAnon.csv", encoding="UTF-8")
+
+
+b <- data.frame(data2$Media_Disciplina, data2$Nome_Disciplina, data2$Nome_Curso, data2$Periodo, data2$Matricula)
+b <- na.omit(b)
+
+colnames(b)[1] <- "medias"
+colnames(b)[2] <- "disciplina"
+colnames(b)[3] <- "curso"
+colnames(b)[4] <- "periodo"
+colnames(b)[5] <- "mat"
+
+
+calc.1 <- b %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D" & disciplina == "CALCULO DIFERENCIAL E INTEGRAL I") %>%
+  group_by(mat) %>%
+  arrange(periodo) %>%
+  filter(row_number() == n()) %>%
+  select(mat, cal.mean = medias)
+
+calc <- head(calc.1, 12)
+
+graf.cal <- ggplot(calc,aes(x = mat, y=cal.mean)) + geom_bar(stat="identity")
+
+mate.disc <- b %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D", disciplina == "MATEMÁTICA DISCRETA") %>%
+  group_by(mat) %>%
+  arrange(periodo) %>%
+  select(mat, mate.mean = medias)
+
+mate <- head(mate.disc, 12)
+  
+graf.mate <- ggplot(mate,aes(x = mat, y=mate.mean)) + geom_bar(stat="identity")
+
+grid.arrange(graf.cal,graf.mate)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

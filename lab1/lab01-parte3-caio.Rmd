@@ -1,0 +1,136 @@
+---
+title: "Lab01-parte3"
+author: "Caio Oliveira"
+date: "November 16, 2016"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+Nessa terceira parte pensando sobre os dados e formulei 3 questionamentos que julgo interessantes:
+
+1) Qual periodo os alunos de computação preferem cursar Engenharia de Software e qual periodo Sistemas de Informação 1? que são os divisores de água do curso
+
+Comentário: É um questionamento válido pois dentro do meu grupo de colegas a maioria está bem atrasada em relação a projetos por terem escolhido cursar ES depois de SI1.
+
+2) Existe alguma correlação entre as notas de P2 e de SI2 para os alunos de computação? 
+
+Comentário: As duas disciplinas abordam temas de modelagem de software, e seria válido saber se o aluno no começo do curso criando uma base sólida de uml, consegue se sair bem em SI2.
+
+
+3) Em qual período (ano) houveram as menores notas no curso de computação nos últimos 5 anos?
+
+Comentário: Devido a realidade das greves que aconteceram, seria válido verificar se existe relação do tempo sem estudo e desistência das disciplinas para o curso de computação
+
+
+
+Eu escolhi responder a 1 e a 2.
+
+
+
+1) observando os gráficos podemos ver que a maioria dos estudantes prefere cursar primeiro SI1 do que ES, mesmo as duas disciplinas sendo do mesmo período na grade curricular.
+
+
+```{r data}
+
+library(plyr)
+library(dplyr)
+library(ggplot2)
+require(gridExtra)
+
+
+data = read.csv(file="/home/caio/Desktop/alunosUFCGAnon.csv", encoding="UTF-8")
+
+alunos.geral <- data.frame(data$Nome_Curso, data$Nome_Disciplina, data$Periodo_Relativo)
+alunos.geral <- na.omit(alunos.geral)
+
+colnames(alunos.geral)[1] <- "curso"
+colnames(alunos.geral)[2] <- "disciplina"
+colnames(alunos.geral)[3] <- "periodo"
+
+
+alunos.de.computacao <- alunos.geral %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D")
+
+si.1 <- alunos.de.computacao %>%
+  filter(disciplina == "SISTEMAS DE INFORMAÇÃO I") %>%
+  group_by(periodo) %>%
+  arrange(periodo)
+
+  
+  
+es.1 <- alunos.de.computacao %>% 
+  filter(disciplina == "ENGENHARIA DE SOFTWARE I") %>%
+  group_by(periodo) %>%
+  arrange(periodo)
+
+
+
+par(mfrow=c(2,1))
+si.hist <- hist(si.1$periodo, main="Sistemas de Informação", xlab="Periodo")
+es.hist <-hist(es.1$periodo, main="Engenharia de Software", xlab="Periodo") 
+```
+
+
+2) observando, fazendo uma projeção vemos médias bem parecidas em alunos que passaram por programção 2 em sistemas de informação 2
+
+
+```{r}
+
+
+library(plyr)
+library(dplyr)
+library(ggplot2)
+require(gridExtra)
+
+
+data = read.csv(file="/home/caio/Desktop/alunosUFCGAnon.csv", encoding="UTF-8")
+
+alunos.geral <- data.frame(data$Nome_Curso, data$Nome_Disciplina, data$Matricula, data$Media_Disciplina)
+alunos.geral <- na.omit(alunos.geral)
+
+colnames(alunos.geral)[1] <- "curso"
+colnames(alunos.geral)[2] <- "disciplina"
+colnames(alunos.geral)[3] <- "matricula"
+colnames(alunos.geral)[4] <- "medias"
+
+
+alunos.cursando.p2 <- alunos.geral %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D" & disciplina == "PROGRAMAÇÃO II") %>%
+  group_by(matricula) %>%
+  arrange(matricula)
+
+p2 <- tail(alunos.cursando.p2, 15)
+
+alunos.cursando.si2 <- alunos.geral %>%
+  filter(curso == "CIÊNCIA DA COMPUTAÇÃO - D" & disciplina == "SISTEMAS DE INFORMAÇÃO II") %>%
+  group_by(matricula) %>%
+  arrange(matricula)
+
+si2 <- tail(alunos.cursando.si2, 15)
+
+
+p2.graph <- ggplot(p2, aes(x=matricula, y=medias)) + geom_bar(stat="identity")
+
+si2.graph <- ggplot(si2, aes(x=matricula, y=medias)) + geom_bar(stat="identity")
+
+grid.arrange(p2.graph, si2.graph)
+
+
+
+
+
+
+```
+
+
+
+
+
+Relatório: 
+
+Podemos ver através da primeira estatística, usando o histograma em relação ao periodo cursado na disciplina que a maioria dos alunos prefere cursar Sistemas de Informação ao invés de Engenharia de Software, além de que se mudarmos os valores para uma amostra maior esses valores continuam na mesma proporção, deixando ainda mais evidente essa conclusão
+
+Nesse segundo gráfico de barras podemos notar no eixo X as matriculas dos alunos que cursam as disciplinas em questão. As duas disciplinas abordam temas de modelagem de dados e se existe qualquer relação entre elas, seria reproduzido nesses gráficos. O qual apontam que as médias das mesmas matriculas nas duas disciplinas tem um erro pequeno, e são na maiorida dos casos proporcionais. O que nos ajuda a concluir que um estudo dedicado na primeira disciplina influencia sim a segunda, mesmo que com um numero de períodos considerável entre as duas disciplinas.
+
+

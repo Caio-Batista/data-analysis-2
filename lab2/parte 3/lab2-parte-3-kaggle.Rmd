@@ -1,0 +1,158 @@
+---
+title: "Problema 2 - Parte III"
+output: html_notebook
+---
+
+```{r, message=FALSE, warning=FALSE}
+require(magrittr)
+require(dplyr)
+require(ggplot2)
+require(reshape2)
+require(readr)
+require(caret)
+require(mice)
+
+##### INICIO PRE PROCESSAMENTO DOS DADOS #####
+
+WORKING.DIR <- "/home/ffosilva/repos/ad2/lab2"
+setwd(WORKING.DIR)
+
+graduados.treino <- read.csv("data/kaggle_train.csv") %>%
+  mutate(matricula = as.factor(matricula))
+
+graduados.treino.imput <- graduados.treino %>%
+  mice(maxit=5, m=5)
+
+graduados.treino.model.input <- complete(graduados.treino.imput, 1)
+graduados.treino.model.input <- graduados.treino.model.input[ ,!(colnames(graduados.treino.model.input) %in% c("matricula"))]
+
+graduados.teste <- read.csv("data/kaggle_test.csv") %>%
+  mutate(matricula = as.factor(matricula))
+
+graduados.teste.imput <- graduados.teste %>%
+  mice(maxit=5, m=5)
+
+graduados.teste.model.input <- complete(graduados.teste.imput, 1)
+graduados.teste.model.input <- graduados.teste.model.input[ ,!(colnames(graduados.teste.model.input) %in% c("matricula"))]
+
+##### FIM DO PRE PROCESSAMENTO DOS DADOS #####
+```
+### 1) Usando todas as variáveis disponíveis (disciplinas do primeiro e segundo período), use validação cruzada (nos dados de treino) para tunar um modelo de regressão Ridge.
+```{r}
+model.ridge.fitControl <- trainControl(method = "cv",
+                           number = 10)
+model.ridge.lambdaGrid <- expand.grid(lambda = 10^seq(10, -2, length=100))
+
+model.ridge <- train(cra ~., data = graduados.treino.model.input,
+               method='ridge',
+               trControl = model.ridge.fitControl,
+               tuneGrid = model.ridge.lambdaGrid
+               )
+
+print (model.ridge)
+```
+
+Um modelo de regressão Ridge, utilizando validação cruzada com 10 folds, temos o valor usado de lambda = 0.04037017 e RMSE = `r min(model.ridge$results$RMSE)`.
+
+### 2) Usando todas as variáveis disponíveis (disciplinas do primeiro e segundo período), use validação cruzada (nos dados de treino) para tunar um modelo de regressão Lasso.
+```{r}
+model.lasso.fitControl <- trainControl(method = "cv",
+                           number = 10)
+model.lasso <- train(cra ~., data = graduados.treino.model.input,
+               trControl = model.lasso.fitControl,
+               method='lasso')
+print(model.lasso)
+```
+
+Um modelo de regressão Lasso, utilizando validação cruzada com 10 folds, temos o melhor valor de RMSE = `r min(model.lasso$results$RMSE)`.
+
+### 3) Compare os dois modelos nos dados de teste em termos de RMSE.
+
+Comparando os dois modelos, o menor RMSE é o do modelo Lasso. (RMSE = `r min(model.lasso$results$RMSE)`)
+
+### 4) Quais as variáveis mais importantes segundo o modelo de regressão Lasso? Alguma variável foi descartada? Quais?
+
+```{r}
+plot(varImp(model.lasso, scale = FALSE))
+```
+Segundo o modelo de regressão Lasso, as três variáveis mais importantes são Teoria dos Grafos, Álgebra Vetorial e Geometria Analítica e Programação II, nesta ordem. O plot acima mostra o grau de importância de cada variável.
+
+```{r}
+predict.enet(model.lasso$finalModel, type='coefficients', s=model.lasso$bestTune$fraction, mode='fraction')
+```
+Foram descartadas as seguintes variáveis: Leitura e Produção de Textos e Laboratório de Programação I.
+
+### 5) Re-treine o melhor modelo (dessa vez nos dados de treino sem validação cruzada) e reporte o RMSE no teste.
+
+```{r}
+model.ridge.lambdaGrid.sem.cv <- expand.grid(lambda = 10^seq(10, -2, length=100))
+
+model.ridge.sem.cv <- train(cra ~., data = graduados.treino.model.input,
+               method='ridge',
+               tuneGrid = model.ridge.lambdaGrid.sem.cv
+               )
+
+print (model.ridge.sem.cv)
+```
+
+Um modelo de regressão Ridge, sem validação cruzada, temos o valor usado de lambda = 0.2154435 e RMSE = `r min(model.ridge.sem.cv$results$RMSE)`.
+
+```{r}
+model.lasso.sem.cv <- train(cra ~., data = graduados.treino.model.input,
+               method='lasso')
+print(model.lasso.sem.cv)
+```
+
+Um modelo de regressão Lasso, sem validação cruzada, temos o melhor valor de RMSE = `r min(model.lasso.sem.cv$results$RMSE)`.
+
+Comparando os dois modelos sem validação cruzada, o menor RMSE é o do modelo Lasso. (RMSE = `r min(model.lasso.sem.cv$results$RMSE)`)
+
+Para o Kaggle, o tune que fiz no modelo foi eliminar as variáveis tidas como menos importantes, exceto Programação II e Lab. de Prog. II que fiz uma interação entre as duas variáveis. O final do código do markdown é o tune que fiz no modelo.
+```{r}
+#### KAGGLE
+graduados.treino.tune <- read.csv("data/kaggle_train.csv") %>%
+  mutate(matricula = as.factor(matricula))
+
+graduados.treino.tune <- graduados.treino.tune[ ,(colnames(graduados.treino.tune) %in% c("matricula","Álgebra.Vetorial.e.Geometria.Analítica","Introdução.à.Computação","Matemática.Discreta","Programação.II","Teoria.dos.Grafos","Laboratório.de.Programação.II","cra"))]
+
+graduados.treino.tune.imput <- graduados.treino.tune %>%
+  mice(maxit=1, m=5)
+
+graduados.treino.tune.model.input <- complete(graduados.treino.tune.imput, 1)
+graduados.treino.tune.model.input <- graduados.treino.tune.model.input %>% mutate(Prog2_Total <- ((Programação.II+ Laboratório.de.Programação.II ) / 2)^2)
+graduados.treino.tune.model.input <- graduados.treino.tune.model.input %>% mutate(TG2 <- Teoria.dos.Grafos/2)
+
+graduados.treino.tune.model.input <- graduados.treino.tune.model.input[ ,!(colnames(graduados.treino.tune.model.input) %in% c("matricula", "Programação.II","Laboratório.de.Programação.II","Teoria.dos.Grafos"))]
+
+graduados.teste.tune <- read.csv("data/kaggle_test.csv") %>%
+  mutate(matricula = as.factor(matricula))
+
+graduados.teste.tune <- graduados.teste.tune[ ,(colnames(graduados.teste.tune) %in% c("matricula","Álgebra.Vetorial.e.Geometria.Analítica","Introdução.à.Computação","Matemática.Discreta","Programação.II","Teoria.dos.Grafos","Laboratório.de.Programação.II","cra"))]
+
+graduados.teste.tune.imput <- graduados.teste.tune %>%
+  mice(maxit=5, m=5)
+
+graduados.teste.tune.model.input <- complete(graduados.teste.tune.imput, 3)
+graduados.teste.tune.model.input <- graduados.teste.tune.model.input %>% mutate(Prog2_Total <- ((Programação.II+ Laboratório.de.Programação.II ) / 2)^2)
+graduados.teste.tune.model.input <- graduados.teste.tune.model.input %>% mutate(TG2 <- Teoria.dos.Grafos/2)
+
+graduados.teste.tune.model.input <- graduados.teste.tune.model.input[ ,!(colnames(graduados.teste.tune.model.input) %in% c("matricula", "Programação.II","Laboratório.de.Programação.II","Teoria.dos.Grafos"))]
+
+model.lasso.tune <- train(cra ~., data = graduados.treino.tune.model.input,
+               trControl = model.lasso.fitControl,
+               method='lasso')
+
+model.tune.lasso.sem.cv <- train(cra ~., data = graduados.treino.tune.model.input,
+               method='lasso')
+
+model.ridge.tune <- train(cra ~., data = graduados.treino.tune.model.input,
+               method='ridge',
+               trControl = model.ridge.fitControl,
+               tuneGrid = model.ridge.lambdaGrid
+               )
+
+cra <- predict(model.ridge.tune, graduados.teste.tune.model.input)
+graduados.teste.tune.cra <- graduados.teste.tune %>% cbind(cra)
+kaggle_out <- select(graduados.teste.tune.cra, matricula, cra)
+write.csv(kaggle_out, "data/kaggle_out.csv", row.names = FALSE)
+```
