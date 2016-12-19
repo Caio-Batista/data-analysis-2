@@ -1,0 +1,278 @@
+---
+title: "Lab-02-parte-3"
+author: "Caio Oliveira"
+date: "December 11, 2016"
+output: html_document
+---
+
+<h3>Importando os dados de treino primeiro</h3>
+```{r}
+library(ISLR)
+library(caret)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+require(gridExtra)
+
+graduados.treino <- read_csv("graduados_treino.csv", col_types = cols(ALU_NOVAMATRICULA = col_character())) %>%
+  mutate(ALU_NOVAMATRICULA = as.factor(ALU_NOVAMATRICULA))
+
+graduados.treino <- graduados.treino %>%
+  arrange(ALU_NOVAMATRICULA)
+
+graduados.treino.clean <- graduados.treino %>%
+  filter(!is.na(MAT_MEDIA_FINAL))
+
+graduados.treino.cra <- graduados.treino.clean %>%
+  group_by(ALU_NOVAMATRICULA) %>%
+  mutate(cra.contrib = MAT_MEDIA_FINAL*CREDITOS) %>%
+  summarise(cra = sum(cra.contrib)/sum(CREDITOS))
+
+graduados.treino.model.input <- graduados.treino.clean %>%
+  group_by(ALU_NOVAMATRICULA,DISCIPLINA)  %>%
+  filter(MAT_MEDIA_FINAL == max(MAT_MEDIA_FINAL)) %>%
+  ungroup() %>%
+  select(ALU_NOVAMATRICULA,DISCIPLINA,MAT_MEDIA_FINAL) %>% 
+  mutate(DISCIPLINA = as.factor(gsub(" ",".",DISCIPLINA))) %>%
+  dcast(ALU_NOVAMATRICULA ~ DISCIPLINA, mean) %>%
+  merge(graduados.treino.cra) %>%
+  na.omit() %>%
+  select(`Cálculo.Diferencial.e.Integral.I`,
+         `Álgebra.Vetorial.e.Geometria.Analítica`,
+         `Leitura.e.Produção.de.Textos`,
+         `Programação.I`,
+         `Introdução.à.Computação`,
+         `Laboratório.de.Programação.I`, # fim primeiro período
+         `Cálculo.Diferencial.e.Integral.II`,
+         `Matemática.Discreta`,
+         `Programação.II`,
+         `Teoria.dos.Grafos`,
+         `Fundamentos.de.Física.Clássica`,
+         `Laboratório.de.Programação.II`,
+         `cra`)
+
+graduados.teste <- read_csv("graduados_teste.csv", col_types = cols(ALU_NOVAMATRICULA = col_character())) %>%
+  mutate(ALU_NOVAMATRICULA = as.factor(ALU_NOVAMATRICULA))
+
+graduados.teste <- graduados.teste %>%
+  arrange(ALU_NOVAMATRICULA)
+
+graduados.teste.clean <- graduados.teste %>%
+  filter(!is.na(MAT_MEDIA_FINAL))
+
+graduados.teste.cra <- graduados.teste.clean %>%
+  group_by(ALU_NOVAMATRICULA) %>%
+  mutate(cra.contrib = MAT_MEDIA_FINAL*CREDITOS) %>%
+  summarise(cra = sum(cra.contrib)/sum(CREDITOS))
+
+graduados.teste.model.input <- graduados.teste.clean %>%
+  group_by(ALU_NOVAMATRICULA,DISCIPLINA)  %>%
+  filter(MAT_MEDIA_FINAL == max(MAT_MEDIA_FINAL)) %>%
+  ungroup() %>%
+  select(ALU_NOVAMATRICULA,DISCIPLINA,MAT_MEDIA_FINAL) %>% 
+  mutate(DISCIPLINA = as.factor(gsub(" ",".",DISCIPLINA))) %>%
+  dcast(ALU_NOVAMATRICULA ~ DISCIPLINA, mean) %>%
+  merge(graduados.teste.cra) %>%
+  na.omit() %>%
+  select(`Cálculo.Diferencial.e.Integral.I`,
+         `Álgebra.Vetorial.e.Geometria.Analítica`,
+         `Leitura.e.Produção.de.Textos`,
+         `Programação.I`,
+         `Introdução.à.Computação`,
+         `Laboratório.de.Programação.I`, # fim primeiro período
+         `Cálculo.Diferencial.e.Integral.II`,
+         `Matemática.Discreta`,
+         `Programação.II`,
+         `Teoria.dos.Grafos`,
+         `Fundamentos.de.Física.Clássica`,
+         `Laboratório.de.Programação.II`,
+         `cra`)
+
+
+
+set.seed(107)
+
+modelo.inicial <- createDataPartition(y = graduados.treino.model.input$cra,
+                                p = 0.90)
+
+treino.sem.teste.real <- graduados.treino.model.input[modelo.inicial[[1]],]
+teste.falso <- graduados.treino.model.input[-modelo.inicial[[1]],]
+
+
+```
+
+
+<h3>Usando o controle de validação cruzada</h3>
+```{r}
+fitControl <- trainControl(method = "cv",
+                           number = 10)
+
+
+```
+
+
+<h3>Usando para a regressão Ridge com validação cruzada e dando seu RMSE</h3>
+```{r}
+# Set seq of lambda to test
+lambdaGrid <- expand.grid(lambda = 10^seq(10, -2, length=100))
+
+ridge <- train(cra ~., data = treino.sem.teste.real,
+               method='ridge',
+               trControl = fitControl,
+               tuneGrid = lambdaGrid
+               )
+
+ridge
+
+
+```
+
+
+Predição com os dados iniciais ainda
+```{r}
+
+ridge.pred <- predict(ridge, teste.falso)
+ridge.pred
+
+```
+RMSE
+
+```{r}
+RMSE <-sqrt(mean(ridge.pred-teste.falso$cra)^2) #RSME
+RMSE
+
+```
+
+
+
+
+<h3>Usando para a regressão Lasso com validação cruzada e dando seu RMSE</h3>
+```{r}
+lasso <- train(cra ~., data = treino.sem.teste.real,
+               method='lasso', trControl=fitControl)
+lasso
+```
+
+Predição com os dados iniciais ainda
+```{r}
+
+lasso.pred <- predict(lasso, teste.falso)
+lasso.pred
+
+```
+
+RMSE
+
+```{r}
+RMSE <-sqrt(mean(lasso.pred-teste.falso$cra)^2) #RSME
+RMSE
+
+```
+
+<h3>Comparando os dois modelos quanto ao RMSE</h3>
+
+Podemos ver que a regressão Ridge, mesmo que por pouco, ainda é melhor que a Lasso nesse caso pois possui o RMSE menor, consequentemente têm o erro menor
+
+
+<h3>Variáveis mais importantes para Lasso</h3>
+
+Podemos ver que as variáveis menos importantes são Cálculo 2 e Leitura e Produção de Textos, para o modelo com regressão do tipo Lasso. 
+
+```{r}
+plot(varImp(lasso, scale = FALSE))
+```
+
+....
+
+<h3>Re-treinando mas sem validação cruzada</h3>
+
+
+```{r}
+ridge <- train(cra ~., data = treino.sem.teste.real,
+               method='ridge',
+               tuneGrid = lambdaGrid
+               )
+
+ridge
+
+
+lasso <- train(cra ~., data = treino.sem.teste.real,
+               method='lasso')
+lasso
+```
+
+
+
+Predições 
+
+```{r}
+ridge.pred <- predict(ridge, teste.falso)
+ridge.pred
+
+lasso.pred <- predict(lasso, teste.falso)
+lasso.pred
+
+```
+
+
+RMSE
+
+```{r}
+
+RMSE.ridge <-sqrt(mean(ridge.pred-teste.falso$cra)^2) #RSME
+RMSE.ridge
+
+RMSE.lasso <-sqrt(mean(lasso.pred-teste.falso$cra)^2) #RSME
+RMSE.lasso
+
+```
+
+
+Nesse caso podemos ver que sem a validação cruzada, Lasso é melhor que Ridge.
+
+....
+
+<h3> Usando os modelos nos testes reais</h3>
+
+Para Ridge
+```{r}
+
+ridge.pred <- predict(ridge, graduados.teste.model.input)
+ridge.pred
+
+RMSE.ridge <-sqrt(mean(ridge.pred-graduados.teste.model.input$cra)^2) #RSME
+RMSE.ridge
+
+```
+
+
+Para Lasso
+
+
+```{r}
+
+lasso.pred <- predict(lasso, graduados.teste.model.input)
+lasso.pred
+
+RMSE.lasso <-sqrt(mean(lasso.pred-graduados.teste.model.input$cra)^2) #RSME
+RMSE.lasso
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
