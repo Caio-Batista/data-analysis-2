@@ -28,7 +28,7 @@ head(dados.sumarizados)
 ....
 
 <h2>1-) Gerando uma visualização que mostre em que ano houve mais evasões</h2>
-<h3>Escolhi esse tipo de gráfico pois fica mais fáciil visualizar intervalo e aproximações gerais de quantos alunos evadem por periodo. Além de também ter sua parte exata, precisão.</h3>
+<h3>Escolhi esse tipo de gráfico pois fica mais fácil visualizar intervalo e aproximações gerais de quantos alunos evadem por periodo. Além de também ter sua parte exata, precisão.</h3>
 
 ```{r}
 set.seed(100)
@@ -41,39 +41,57 @@ plot_ly(dados.sumarizados, x = ~MAT_TUR_ANO, y = ~EVADIU_CURSO, color = ~EVADIU_
 
 ....
 <h2>2-) Gerando uma visualização da distribuição das classes</h2>
-<h3>Aqui temos uma visualização com a variável "EVADIU", que será classificada na regressão posteriormente. Vemos uma diferença muito grande entre a quantidade referente as classes</h3>
+<h3>Aqui temos uma visualização com a variável "EVADIU", que será classificada na regressão posteriormente. Vemos uma diferença muito grande entre a quantidade referente as classes.</h3>
 
 ```{r}
+total.evasoes <- dados.sumarizados %>% 
+  summarise(EVADIU = sum(EVADIU_CURSO), NAO_EVADIU_ = sum(NAO_EVADIU))
 
+head(total.evasoes)
 
+final_df <- as.data.frame(t(total.evasoes))
+head(final_df)
 
+names(final_df)[names(final_df)=="V1"] <- "frequencia"
+
+colors = c("blue", "green")
+nam = c("Evadiu","Não evadiu")
+barplot(final_df$frequencia,col = colors, names.arg = nam)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 ....
 
+<h2>Há desbalanceamento das classes? Em que proporção? Quais efeitos colaterais o desbalancemanento de classes pode causar no classificador?</h2>
+<h3>Pelo gráfico anterior, vemos claramente um desbalanceamento muito grande para o lado das "não-evasões", o que pode ocasionar em uma predição e regressão inapropriadas para essas classes, gerando um enviesamento do modelo a ser construido.</h3>
+<h3>Quanto a questão da proporcionalidade podemos ver a seguir que a diferença é de mais de 90%</h3>
+
+```{r}
+
+evadiu <- total.evasoes[,c('EVADIU')]
+nao.evadiu <- total.evasoes[,c('NAO_EVADIU_')]
+
+total.valores <- evadiu + nao.evadiu
+
+nao.evadiu.freq <- nao.evadiu/total.valores
+evadiu.freq <- evadiu/total.valores
+freq <- c(evadiu.freq,nao.evadiu.freq)
+
+proporcao <- data.frame(nam, freq)
+p <- proporcao[1,c(2,3)]
+proporcao <- as.data.frame(t(p))
+
+colors = c("blue", "green")
+nam = c("Evadiu","Não evadiu")
+p <- proporcao[,c("1")]
+barplot(p, col = colors, names.arg = nam)
+
+```
 
 
+....
 
-
-
+<h2>4-) TODO </h2>
 
 
