@@ -1,0 +1,79 @@
+---
+title: "lab03-parte1"
+author: "Caio Oliveira"
+date: "February 13, 2017"
+output: html_document
+---
+
+<h1>Laboratório 3, Parte 1: Entendendo os Dados</h1>
+<h2>Tema: Regressão logística</h2>
+....
+<h3>tratamento incial dos dados</h3>
+```{r}
+
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+training.data.raw <- read.csv('~/data-analysis-2/lab3/treino_classificacao.csv',header=T)
+
+
+dados.sumarizados <- training.data.raw %>%
+  group_by(MAT_TUR_ANO) %>%
+  summarise(EVADIU_CURSO = sum(EVADIU == TRUE), NAO_EVADIU = sum(EVADIU==FALSE))
+
+head(dados.sumarizados)
+
+```
+....
+
+<h2>1-) Gerando uma visualização que mostre em que ano houve mais evasões</h2>
+<h3>Escolhi esse tipo de gráfico pois fica mais fáciil visualizar intervalo e aproximações gerais de quantos alunos evadem por periodo. Além de também ter sua parte exata, precisão.</h3>
+
+```{r}
+set.seed(100)
+
+plot_ly(dados.sumarizados, x = ~MAT_TUR_ANO, y = ~EVADIU_CURSO, color = ~EVADIU_CURSO,
+        size = ~EVADIU_CURSO)
+
+```
+
+
+....
+<h2>2-) Gerando uma visualização da distribuição das classes</h2>
+<h3>Aqui temos uma visualização com a variável "EVADIU", que será classificada na regressão posteriormente. Vemos uma diferença muito grande entre a quantidade referente as classes</h3>
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+....
+
+
+
+
+
+
+
+
