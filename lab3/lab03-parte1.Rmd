@@ -63,7 +63,7 @@ barplot(final_df$frequencia,col = colors, names.arg = nam)
 
 ....
 
-<h2>Há desbalanceamento das classes? Em que proporção? Quais efeitos colaterais o desbalancemanento de classes pode causar no classificador?</h2>
+<h2>3-) Há desbalanceamento das classes? Em que proporção? Quais efeitos colaterais o desbalancemanento de classes pode causar no classificador?</h2>
 <h3>Pelo gráfico anterior, vemos claramente um desbalanceamento muito grande para o lado das "não-evasões", o que pode ocasionar em uma predição e regressão inapropriadas para essas classes, gerando um enviesamento do modelo a ser construido.</h3>
 <h3>Quanto a questão da proporcionalidade podemos ver a seguir que a diferença é de mais de 90%</h3>
 
@@ -92,6 +92,28 @@ barplot(p, col = colors, names.arg = nam)
 
 ....
 
-<h2>4-) TODO </h2>
+<h2>4-) Criando um atributo novo, que não seja a média da disciplina, que você acha que pode ajudar na classificação.</h2>
+<h3>Durante o curso vi muitas pessoas desistindo por causa da reprovação em duas cadeiras que são base do curso: Cálculo 1 e Programação 1. Tendo em vista que Programação 1 e Lab. de Programação 1 são a mesma nota, para a nova variável em questão só consideraremos Programação 1. Fazendo então a média (por aluno) dessas duas fundamentais disciplinas do começo do curso, que tenho certeza que será um bom fator para prever a evasão.</h3>
+```{r}
+
+alunos.calc <- training.data.raw %>%
+  filter(disciplina == "Cálculo Diferencial e Integral I")
+alunos.prog <-training.data.raw %>%
+  filter(disciplina == "Programação I")
+
+calcprog <- union(alunos.calc, alunos.prog) %>%
+  group_by(MAT_ALU_MATRICULA)
+
+calcprog[is.na(calcprog)] <- 0
+
+calcprog.media <- calcprog %>%
+  group_by(MAT_ALU_MATRICULA, MAT_TUR_ANO, EVADIU) %>%
+  summarise(IMPORTANTES_MEDIA= mean(MAT_MEDIA_FINAL, na.rm = TRUE))
 
 
+head(calcprog.media)
+
+```
+
+....
+<p>EOF</p>
