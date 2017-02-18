@@ -1,0 +1,13 @@
+---
+title: "lab3-parte2"
+author: "Caio Oliveira"
+date: "February 18, 2017"
+output: html_document
+---
+
+
+
+
+```{r}
+
+```
