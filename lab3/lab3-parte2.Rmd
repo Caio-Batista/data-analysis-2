@@ -5,9 +5,165 @@ date: "February 18, 2017"
 output: html_document
 ---
 
+<h1>Laboratório 3, Parte 2: Prevendo evasões</h1>
+<h2>Tema: Regressão logística</h2>
+....
 
+<h3>Tratamento inicial dos dados</h3>
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(readr)
+library(reshape2)
+library(party)
 
+data <- read.csv("/home/caio/data-analysis-2/lab3/treino_classificacao_v2.csv", header = TRUE, encoding = "UTF-8") %>%
+  mutate(MAT_ALU_MATRICULA = as.factor(MAT_ALU_MATRICULA)) %>%
+  mutate(disciplina = as.factor(disciplina)) %>%
+  mutate(EVADIU = as.factor(EVADIU))
+
+#a <-reshape(data,idvar = c("MAT_ALU_MATRICULA","EVADIU", "MAT_TUR_ANO","MAT_TUR_PERIODO"),timevar = c("disciplina"), direction = "wide" )
+
+data.formated <- dcast(data ,MAT_ALU_MATRICULA + MAT_TUR_ANO + MAT_TUR_PERIODO + EVADIU ~ disciplina, value.var="MAT_MEDIA_FINAL")
+data.formated[is.na(data.formated)] <- 0
+
+head(data.formated)
+
+```
+....
+
+<h2>1-) Separando os dados em treino e teste</h2>
 
 ```{r}
 
+
+
+#dados de treino (2000 - 2014)
+treino <- data.formated[data.formated$MAT_TUR_ANO <= 2014, ]
+
+#dados de teste (2015)
+teste <- data.formated[data.formated$MAT_TUR_ANO > 2014, ]
+
+head(treino)
+head(teste)
+
+
 ```
+
+....
+
+<h2>2-) Usando como atributos as médias das disciplinas mais o atributo "Média das essenciais"</h2>
+<h3>Fiz a escolha de criar uma variável que é a média das duas disciplinas que geralmente fazem os alunos desistirem do curso:  Cálculo 1  e Programação 1.</h3>
+
+```{r}
+
+data.mediado.treino <- treino %>%
+  mutate(media = (`Álgebra Vetorial e Geometria Analítica` + `Cálculo Diferencial e Integral I` + `Programação I` + `Introdução à Computação` + `Leitura e Produção de Textos` + `Laboratório de Programação I` )/6) %>%
+  mutate(media.essen = (`Cálculo Diferencial e Integral I` + `Programação I`)/2)
+
+
+data.mediado.teste <- teste %>%
+  mutate(media = (`Álgebra Vetorial e Geometria Analítica` + `Cálculo Diferencial e Integral I` + `Programação I` + `Introdução à Computação` + `Leitura e Produção de Textos` + `Laboratório de Programação I` )/6) %>%
+  mutate(media.essen = (`Cálculo Diferencial e Integral I` + `Programação I`)/2)
+
+
+head(data.mediado.treino)
+head(data.mediado.teste)
+
+```
+
+....
+
+<h2>3-) Treinando modelos de regressão logística</h2>
+
+```{r}
+
+#mod.regressao.logistica <- train(EVADIU ~ media + media.essen, data=data.mediado.treino, method="glm", family="binomial")
+logic.model <- glm(EVADIU ~media + media.essen ,family=binomial(link='logit'),data=data.mediado.treino)
+summary(logic.model)
+
+```
+
+....
+
+<h2>4-) Treinando modelos de árvore de decisão</h2>
+
+```{r}
+
+output.tree <- ctree(
+  EVADIU ~ media + media.essen, 
+  data = data.mediado.treino)
+  
+# Plot the tree.
+plot(output.tree)
+
+
+```
+
+
+<h2>5-) Interpretando os coeficientes da regressão</h2>
+<h3>Podemos ver que no caso dos coeficientes para as regressões, tanto para a regressão logistica como a árvore de decisão, o p-value de 'media' é bem menor que o de 'media.essen'. O que nos mostra que 'media' é um atributo bem mais importante que 'media.essen' para predição.</h3>
+
+....
+
+<h2>6-) Reporte acurácia, precision e recall no treino e teste</h2>
+<h3>Através dos coeficientes podemos ver que a acurácia para a regressão glm é maior do que para a árvore de decisão.</h3>
+
+```{r}
+arvore <- predict(output.tree,data.mediado.teste, type='response')
+arvore <- ifelse(arvore > 0.7,1,0)
+misClasificError <- mean(arvore != data.mediado.teste$EVADIU)
+print(paste('Accuracy da DT:',1-misClasificError))
+
+
+regressao.logica <- predict(logic.model, data.mediado.teste)
+regressao.logica <- ifelse(regressao.logica > 0.7,1,0)
+misClasificError <- mean(regressao.logica != data.mediado.teste$EVADIU)
+print(paste('Accuracy da GLM:',1-misClasificError))
+
+#falta fazer recall e precision
+
+
+
+```
+
+....
+
+<h2>7-) Controle overfitting usando validação-cruzada </h2>
+
+```{r}
+arvore.cv <- ctree(
+  EVADIU ~ media + media.essen, 
+  data = data.mediado.treino, controls = ctree_control(maxdepth = 1))
+plot(arvore.cv)
+
+
+ridge.grid <- expand.grid(alpha = c(0,  .1,  .2, .4, .6, .8, 1),lambda = seq(.01, .2, length = 20))
+ridge.control <- trainControl(method = "cv", number = 10)
+rigde.tunado.cv <- train(EVADIU ~ media + media.essen,
+                                          data=data.mediado.treino,
+                                          method = "glmnet",
+                                          preProcess = c("center", "scale"),
+                                          tuneGrid = ridge.grid,
+                                          trControl = ridge.control)
+ridge.predict <- predict(rigde.tunado.cv, data.mediado.teste)
+ridge.predict
+
+lasso.control <- trainControl(method = "repeatedcv", number = 10, repeats = 3, verboseIter = TRUE)
+lasso <- train(EVADIU ~ media  + media.essen,
+                                          data=data.mediado.treino,
+                                          method = "glmnet",
+                                          preProcess = c("center", "scale"),
+                                          trControl = lasso.control)
+lasso
+```
+
+
+
+
+EOF
+
+
+
+
