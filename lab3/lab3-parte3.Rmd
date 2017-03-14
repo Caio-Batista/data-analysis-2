@@ -5,5 +5,66 @@ date: "March 13, 2017"
 output: html_document
 ---
 
-```{r }
+
+<h1>Parte 3: Competindo pela melhor predição</h1>
+<h2>Tema: Regressão logística</h2>
+....
+
+<h3>Tratamento dos dados</h3>
+```{r}
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(readr)
+library(reshape2)
+library(party)
+
+
+WORKING.DIR <- "/home/caio/data-analysis-2/lab3"
+setwd(WORKING.DIR)
+
+
+alunos.treino <- read.csv("kaggle/lab3_kaggle_classificacao_treino.csv", header = TRUE, encoding = "UTF-8") %>%
+  mutate(MAT_ALU_MATRICULA = as.factor(MAT_ALU_MATRICULA)) %>%
+  mutate(disciplina = as.factor(DISCIPLINA)) %>%
+  mutate(EVADIU = as.factor(EVADIU))
+
+
+alunos.treino <- dcast(alunos.treino ,MAT_ALU_MATRICULA + MAT_TUR_ANO + MAT_TUR_PERIODO + EVADIU ~ disciplina, value.var="MAT_MEDIA_FINAL")
+alunos.treino[is.na(alunos.treino)] <- 0
+
+alunos.treino.formated <- alunos.treino %>%
+  mutate(media = (`Álgebra Vetorial e Geometria Analítica` + `Cálculo Diferencial e Integral I` + `Programação I` + `Introdução à Computação` + `Leitura e Produção de Textos` + `Laboratório de Programação I` )/6) %>%
+  mutate(media.essen = (`Cálculo Diferencial e Integral I` + `Programação I`)/2)
+
+logic.model <- glm(EVADIU ~media + media.essen ,family=binomial(link='logit'),data=alunos.treino.formated)
+
+alunos.teste<- read.csv("kaggle/lab3_kaggle_classificacao_teste.csv", header = TRUE, encoding = "UTF-8") %>%
+  mutate(MAT_ALU_MATRICULA = as.factor(MAT_ALU_MATRICULA)) %>%
+  mutate(disciplina = as.factor(DISCIPLINA)) 
+
+alunos.teste <- dcast(alunos.teste ,MAT_ALU_MATRICULA + MAT_TUR_ANO + MAT_TUR_PERIODO ~ disciplina, value.var="MAT_MEDIA_FINAL")
+alunos.teste[is.na(alunos.teste)] <- 0
+
+alunos.teste.formated <- alunos.teste %>%
+  mutate(media = (`Álgebra Vetorial e Geometria Analítica` + `Cálculo Diferencial e Integral I` + `Programação I` + `Introdução à Computação` + `Leitura e Produção de Textos` + `Laboratório de Programação I` )/6) %>%
+  mutate(media.essen = (`Cálculo Diferencial e Integral I` + `Programação I`)/2)
+
+evadiu <- predict(logic.model,alunos.teste.formated)
+
+# Colocando os dados no CSV
+teste.evadiu <- alunos.teste.formated %>% cbind(evadiu)
+saida <- select(teste.evadiu, MAT_ALU_MATRICULA, evadiu)
+final <- saida  %>%
+  mutate(evadiu = ifelse(evadiu < 0, FALSE,
+               ifelse(evadiu >= 0, TRUE, NA)))
+names(final)[names(final)=="evadiu"] <- "EVADIU"
+write.csv(final, "agora_vai.csv", row.names = FALSE)
+
 ```
+....
+
+<h2>Relatório da abordagem</h2>
+<h3>Para fazer a regressão logística escolhi usar uma variável além da média das disciplinas, essa variável 'media.essen' corresponde a uma média específica para as duas disciplinas que fazem os alunos mais desistirem do curso, que são cálculo 1 e programação 1.</h3>
+<h3>Usei para a predição o modelo glm sem validação cruzada. Que por experiência foi melhor que os outros modelos que tinham escolhido na parte anterior deste laboratório.</h3>
+....
