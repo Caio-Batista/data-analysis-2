@@ -1,0 +1,65 @@
+---
+title: "Hackfest - Medo bobo"
+author: "Caio Oliveira"
+date: "June 10, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(readr)
+options(scipen=999)
+
+setwd("~/Teupassadotecondena/data/")
+features <- read_csv("features.csv", col_types = cols(nu_CPFCNPJ = col_character())) 
+most.voted <- head(features[order(features$qtdContratos_ganhos, decreasing = TRUE), ], n = 20)
+#first.plot <- plot_ly(y = features$qtdContratos_ganhos, x= features$nu_CPFCNPJ ,type = "bar", color = features$valor_total)
+first.plot <- ggplot(most.voted, aes(x=nu_CPFCNPJ, y=qtdContratos_ganhos, size = valor_total,color=valor_total)) +
+    geom_point(shape=1) +    # Use hollow circles
+    coord_flip() +
+    scale_color_gradient(low="blue", high="red")
+
+
+
+#most.voted$nu_CPFCNPJ <- factor(most.voted$nu_CPFCNPJ, levels = most.voted$nu_CPFCNPJ[order(most.voted$qtdContratos_ganhos)])
+
+dd.plot <- ggplot(data=most.voted, aes(x=nu_CPFCNPJ, y=qtdContratos_ganhos)) +
+  geom_bar(stat="identity", fill="steelblue")+
+  geom_text(aes(label=qtdContratos_ganhos), hjust=1.6, color="white", size=3.5)+
+  theme_minimal() + coord_flip()
+#dd.plot <- plot_ly(most.voted, y = most.voted$qtdContratos_ganhos, x= most.voted$nu_CPFCNPJ, type = "scatter" , size = ~valor_total, color = ~valor_total, coord_flip = TRUE)
+```
+
+```{r}
+dd.plot
+ggsave("second.png")
+
+```
+
+
+```{r}
+first.plot
+ggsave("first.png")
+```
+
+```{r}
+third.plot <- ggplot(features, aes(x=valor_total_convite, y=valor_total, size = valor_total,color=valor_total)) +
+    geom_point(shape=1) +    # Use hollow circles
+    coord_flip() +
+    scale_color_gradient(low="blue", high="red")
+#third.plot <- plot_ly(features,y =~valor_total, x= ~valor_total_convite ,type = "scatter", color = ~nu_CPFCNPJ)
+third.plot
+ggsave("third.png")
+# if (!require("webshot")) install.packages("webshot")
+# tmpFile <- tempfile(fileext = ".png")
+# export(third.plot, file = tmpFile)
+# browseURL(tmpFile)
+```
+
+

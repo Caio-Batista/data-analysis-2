@@ -1,0 +1,91 @@
+---
+title: "Lab02 - Parte 1"
+author: "Caio Oliveira"
+date: "June 5, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+<h1>Laboratório 2, Parte 1: Revisitando uma visualização sua</h1>
+<h2>Tema: Análise dos dados do IMDB</h2>
+....
+<h3><b>Como se distribuem os episódios de um conjunto finito de séries? Quais tem votos mais semelhantes e quais tem muita variação de votos?</b></h3>
+<h4>Nesse laboratório de recriação de uma das nossas visualizações eu decidi usar essa pergunta pois é bem interessante vermos como se distribuem os votos dos usuários por episódio. Então para tal usei 5 séries que gosto bastante, sendo elas: House of Cards, Sense8, 13 Reasons Why, Daredevil, Gotham.</h4>
+
+```{r setup,echo=FALSE,include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+setwd("~/data-analysis-2/ad1/lab1")
+data <-  read.csv("series_from_imdb.csv")
+a <- data %>% filter(series_name %in% c("House of Cards", "Sense8", "13 Reasons Why", "Daredevil", "Gotham")) 
+```
+
+
+
+
+
+```{r, echo=FALSE, warning=FALSE}
+
+
+series <- data.frame(as.character(a$series_name),a$UserRating)
+series <- na.omit(series)
+
+colnames(series)[1] <- "nome"
+colnames(series)[2] <- "rating"
+
+hoc <- series %>%
+  filter(nome == "House of Cards")
+
+sense.8 <- series %>%
+  filter(nome == "Sense8")
+
+trw <- series %>%
+  filter(nome == "13 Reasons Why")
+
+dd <- series %>%
+  filter(nome == "Daredevil")
+
+gotham <- series %>%
+  filter(nome == "Gotham")
+
+p <- plot_ly(y = ~series$rating,x = ~series$nome, color = ~a$series_name,type = "box") 
+p
+```
+
+<h3><b>Motivação e escolha da forma de visualização dos dados</b></h3>
+<h4>Como estamos tratando de variáveis discretas aqui em conjuntos diferentes o boxplot é uma boa maneira de observarmos como se distribuem os votos dos usuários. Nesse caso, se o gráfico é mais curto e com as extremidades mais próximas indica que não exite muita variação nos votos. O contrário também é válido, se um boxplot tem eixos mais prolongados e a "caixa" central é mais dilatada podemos notar uma variação maior dos votos.</h4>
+<h4>O gráfico acima mostra para todas as séries analisadas conjuntamente em um mesmo gráfico com o eixo X sendo o nome das séries e o Y sendo a pontuação dada nos votos. Além desse gráfico decidi fazer invidual também pois queria ajudar a ver a dispersão dos pontos além somente do boxplot da série. Para isso usei um Scatterplot ao lado do Boxplot. Os gráficos individuais vem logo a seguir.</h4>
+
+```{r, echo=FALSE, warning=FALSE}
+hoc.plot <- plot_ly(y = hoc$rating, type = "box", boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, color = hoc$nome)
+hoc.plot
+
+sense.8.plot <- plot_ly(y = sense.8$rating, type = "box", boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, color = sense.8$nome)
+sense.8.plot
+
+dd.plot <- plot_ly(y = dd$rating, type = "box", boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, color = dd$nome)
+dd.plot 
+
+trw.plot <- plot_ly(y = trw$rating, type = "box", boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, color = trw$nome)
+trw.plot
+
+gotham.plot <- plot_ly(y = gotham$rating, type = "box", boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, color = gotham$nome)
+gotham.plot
+
+
+
+```
+
+<h3><b>Conclusão</b></h3>
+<h4>Podemos ver com essas visualizações que a série que contêm uma distribuição com variação maior de valores para a variável UserRating(votos dos usuários) é a série Sense8, e a que é mais contida, ou seja tem menos variação é Daredevil.</h4>
+<h4>Vale ressaltar aqui que depois do estudo feito vemos que somente duas das séries escolhidas possuem outliers (valores atípicos ou extremos) que são: Gotham e Sense8. Sense8 já era de se esperar pela sua grande variação em relação as outras séries mas Gotham foi uma surpresa.</h4>
+<h4>Outro ponto que vale ressaltar é que existem comportamentos parecidos entre as séries e.g.:House of Cards e Sense8. As duas (retirando-se os outliers de Sense8) tem uma distribuição muito semelhante apesar do boxplot de House of Cards estar deslocado para baixo no eixo Y.</h4>
