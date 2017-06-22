@@ -143,7 +143,7 @@ filmes %>%
     geom_rug()
 ```
 
-## Duas dimensões
+# Análise em duas dimensões das variáveis
 
 Nessa sessão está sendo feito o estudo das duas variáveis <b>RATING</b> e <b>BOX OFFICE</b>, e para tal a melhor forma de vermos é em um Scatterplot. Aqui as variáveis foram separadas em cinco grupos, que serão descritos logo após, através das informações proveniêntes dos gráficos anteriormente discutidos, em especial dos histogramas que serviram para estimar a quantidade mais apropriada de grupos para essa divisão.
 <p><b>Grupo 1 - Sessão da tarde:</b> O primeiro grupo é composto daqueles filmes que tem a aprovação em média de 50% e o Box office menor ou igual a 100, são filmes que pecaram pelo roteiro e não necessariamente pela produção, caindo no esquecimento como Demolidor, ou se lembrados de uma forma não tão boa. Mas ainda hoje passam em canais de tv aberta ou fechada como filmes de sessão da tarde e não em horário nobre.</p>
@@ -159,7 +159,7 @@ p = atribuicoes %>%
 ggplotly(p)
 ```
 
-### Linkage 
+## Linkage 
 
 Aqui o linkage para cada uma das variáveis, ambas divididas em 5 grupos.
 
@@ -175,7 +175,7 @@ plota_hclusts_1d(filmes, "`BOX OFFICE`",
                  ks = 1:5)
 ```
 
-### Combinação das variáveis
+## Combinação das variáveis
 
 Neste bloco apenas uma maneira mais fácil de ver os grupos em forma de scatterplot com conexão entre os pontos. Ressaltando o comportamento descrito acima por cada um dos grupos, os padrões e diferenças.
 
