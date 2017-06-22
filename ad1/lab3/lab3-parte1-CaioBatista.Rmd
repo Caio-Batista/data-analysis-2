@@ -1,0 +1,193 @@
+---
+title: "Lab 03 - Parte 1"
+author: "Caio Oliveira"
+date: "June 20, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse, warn.conflicts = F)
+library(rvest)
+library(plotly)
+library(cluster)
+library(ggdendro)
+theme_set(theme_light())
+source("plota_solucoes_hclust.R")
+```
+
+# Tipos de filme de Ben Affleck
+
+Este ator do mundo cinematográfico ultimamente mais conhecido como "O novo batman" vem ganhando um destaque muito grande não somente devido a suas participações em filmes mas como produtor e diretor também, em alguns casos sendo essas três categorias ao mesmo tempo, o que torna admirável seu amor e dedicação ao seu trabalho. Por esse motivo escolhi ele para fazer essa análise. 
+
+## Tratamento dos dados e parser
+
+Aqui foi feito o parser dos filmes de acordo com o código que o professor disponibilizou.
+
+```{r, warning=FALSE}
+from_page <- read_html("https://www.rottentomatoes.com/celebrity/ben_affleck/") %>% 
+    html_node("#filmographyTbl") %>% # A sintaxe da expressão é de um seletor à lá JQuery: https://rdrr.io/cran/rvest/man/html_nodes.html 
+    html_table(fill=TRUE) %>% # Faz parse
+    as.tibble()
+
+filmes = from_page %>% 
+    filter(RATING != "No Score Yet", 
+           `BOX OFFICE` != "—", 
+           CREDIT != "Executive Producer") %>%
+    mutate(RATING = as.numeric(gsub("%", "", RATING)), 
+           `BOX OFFICE` = as.numeric(gsub("[$|M]", "", `BOX OFFICE`))) %>% 
+    filter(`BOX OFFICE` >= 1) # Tem dois filmes que não parecem ter sido lançados no mundo todo
+
+solucoes = tibble(k = 1:5)
+
+row.names(filmes) = NULL
+agrupamento_h = filmes %>% 
+    column_to_rownames("TITLE") %>% 
+    select(RATING) %>%
+    dist(method = "euclidian") %>% 
+    hclust(method = "ward.D")
+
+atribuicoes = solucoes %>% 
+    group_by(k) %>% 
+    do(cbind(filmes, 
+             grupo = as.character(cutree(agrupamento_h, .$k)))) 
+```
+
+
+# Análise em uma dimensão das variáveis
+
+## RATING 
+
+Para a variável de notas, pontuação, dada no Rotten Tomatoes podemos analisar de duas formas principais com Scatterplot e Histograma.
+
+### Scatterplot sem normalização
+
+Nesse primeiro Scatterplot podemos perceber a presença de vários grupos e uma distribuição bem variada, ou seja, quase todo tipo de pontuação por filmes. O que faz com que o gráfico fique ocupando quase todo o eixo Y com pontos. PAra minimizar isso e deixar e evidencia os grupos nesse caso vamos usar a normalização 
+```{r}
+filmes %>% 
+    ggplot(aes(x = "Filmes", y = RATING)) + theme_bw() + 
+    geom_jitter(width = .01, height = 0, size = 2, alpha = .6)
+```
+
+### Scatterplot com normalização
+
+Com a normalização aqui podemos ver dois grupos bem definidos, sendo um deles que se localiza acima de 50 e outro que se concentra perto de 0, que são os casos de filmes como <b>Gigli</b> e <b>Surviving Christmas</b>. 
+
+```{r}
+filmes %>% 
+    ggplot(aes(x = "Filmes", y = RATING)) + 
+    geom_jitter(width = .01, height = 0, size = 2, alpha = .6) +
+    scale_y_log10()
+```
+
+### Histograma com agrupamento
+
+Aqui podemos ver com o agrupamento que existem 5 grupos com o comportamento parecido em que podemos separar os filmes, em relação a variável Rating, esses grupos dão divididos em intervalos muito parecidos, e ao observarmos o gráfico temos que 80% dos grupos tem pelo menos 3 filmes. Como no exemplo anterior vimos dois dos três filmes com menores notas, aqui vamos destacar os dois maiores: <b>Argo</b> e <b>Gone Baby Gone</b>. 
+
+
+```{r}
+filmes %>% 
+    ggplot(aes(x = RATING))  +
+    geom_histogram(bins = 16) + 
+    geom_rug()
+```
+
+### Agrupamento com hclust
+
+Podemos aqui ver as colunas e como cada filme se encaixa em um grupo específico pelo seu rating, vemos o comportamento padrão por titulo aqui e comprovamos o que foi visto na análise anterior, de que os grupos com menores notas se concentram, assim como os de maiores notas também. Podemos ver os grupos os quais <b>Argo</b>(maior nota) e <b>Gigli</b>(menor nota) pertencem.  
+
+```{r, warning=FALSE}
+ggdendrogram(agrupamento_h, rotate = T, size = 2) 
+```
+
+## BOX OFFICE
+
+Vamos mudar o foco da variável aqui para a arrecadação total dos filmes que o ator em questão participou. E fazer a mesma análise que foi feita para o Rating nas sessões anteriores desse lab.
+
+### Scatterplot sem normalização
+
+Podemos perceber com esse gráfico a presença de pelos menos 4 grupos que se concentram perto de 0 outro ao redor de 100, um elemento em 200 e outro em 300. Ainda com esse gráfico vemos uma proporção muito maior de filmes com uma baixa renda em comparação a os maiores, incluindo filmes que foram bem votados como <b>State of Play</b>.
+
+```{r}
+
+filmes %>% 
+    ggplot(aes(x = "Filmes", y = `BOX OFFICE`)) + theme_bw() + 
+    geom_jitter(width = .01, height = 0, size = 2, alpha = .6)
+```
+
+
+### Scatterplot com normalização
+
+O mesmo gráfico com normalização já é mais difícil de diferenciar os grupos presentes. Não conseguimos extrair muitas informações com essa visualização, então faremos a avaliação definitiva com o o histograma por grupos. 
+
+```{r}
+filmes %>% 
+    ggplot(aes(x = "Filmes", y = `BOX OFFICE`)) + 
+    geom_jitter(width = .02, height = 0, size = 2, alpha = .6) + 
+    scale_y_log10()
+```
+
+### Agrupamento com hclust
+
+Agora com essa visualização podemos ver que a quantidade de grupos é parecida com a estimada no primeiro Scatterplot para essa variável, com uma concentração bem maior de filmes quando BOX OFFICE < 150. 
+Diferente do que vimos com o Rating, essa variável diminui conforme aumenta no eixo X, o que mostra que a quantidade de filmes que teve uma renda maior é bem menor do que a maioria dos filmes estreados ou produzidos por Ben Affleck. 
+
+```{r}
+filmes %>% 
+    ggplot(aes(x = `BOX OFFICE`)) + 
+    geom_histogram(bins = 20) + 
+    geom_rug()
+```
+
+## Duas dimensões
+
+Nessa sessão está sendo feito o estudo das duas variáveis <b>RATING</b> e <b>BOX OFFICE</b>, e para tal a melhor forma de vermos é em um Scatterplot. Aqui as variáveis foram separadas em cinco grupos, que serão descritos logo após, através das informações proveniêntes dos gráficos anteriormente discutidos, em especial dos histogramas que serviram para estimar a quantidade mais apropriada de grupos para essa divisão.
+<p><b>Grupo 1 - Sessão da tarde:</b> O primeiro grupo é composto daqueles filmes que tem a aprovação em média de 50% e o Box office menor ou igual a 100, são filmes que pecaram pelo roteiro e não necessariamente pela produção, caindo no esquecimento como Demolidor, ou se lembrados de uma forma não tão boa. Mas ainda hoje passam em canais de tv aberta ou fechada como filmes de sessão da tarde e não em horário nobre.</p>
+<p><b>Grupo 2 - Polêmicos:</b> Esse segundo grupo é dos filmes que são muito proximos de 25% de aprovação, mas que todos deram um Box office maior que 25. Esses filmes se encaixam nesse grupo por terem sido filmes bem divulgados, mas não cairam no gosto da população, esperavam muito mais do que foi. O caso mais preciso disso é <b>Batman vs Superman</b>.</p> 
+<p><b>Grupo 3 - Excluidos:</b> No caso desse terceiro grupo são basicamente os filmes que não deram lucro e tem as piores notas entre todos. Foi o grupo mais bem definido em todas as outras análises. Esses filmes tiveram pouca divulgação além de terem roteiros "fracos" ou "difíceis de entender" segundo a maioria dos usuários do Rotten Tomatoes</p> 
+<p><b>Grupo 4 - Do povão:</b> O quarto grupo é feito basicamente de filmes que tem notas medianas (entre 60 e 70%) entretanto não tiveram um Box office tão grande.</p>
+<p><b>Grupo 5 - Oscar:</b> Esse grupo é composto em quase sua maioria por filmes que foram indicados ao Oscar em alguma categoria. Dentre eles <b>Argo</b>, indicado a melhor filme. São filmes que tem uma aprovação próxima de 90%, mesmo não sendo os de maior Box office.</p>
+
+```{r}
+p = atribuicoes %>% 
+    ggplot(aes(x = RATING, y = `BOX OFFICE`, label = TITLE)) + 
+    geom_point(aes(colour = factor(grupo))) 
+ggplotly(p)
+```
+
+### Linkage 
+
+Aqui o linkage para cada uma das variáveis, ambas divididas em 5 grupos.
+
+```{r, warning=FALSE}
+plota_hclusts_1d(filmes, "RATING", 
+                 linkage_method = "complete", 
+                 ks = 1:5)
+```
+
+```{r , warning=FALSE}
+plota_hclusts_1d(filmes, "`BOX OFFICE`", 
+                 linkage_method = "complete",
+                 ks = 1:5)
+```
+
+### Combinação das variáveis
+
+Neste bloco apenas uma maneira mais fácil de ver os grupos em forma de scatterplot com conexão entre os pontos. Ressaltando o comportamento descrito acima por cada um dos grupos, os padrões e diferenças.
+
+```{r}
+atribuicoes %>% 
+    filter(k == 5) %>%
+    ggplot(aes(x = RATING , y = `BOX OFFICE`, colour = grupo)) + 
+    geom_point(alpha = .3, size = .5) + 
+    geom_line(alpha = .7) + 
+    facet_wrap(~ paste("Grupo ", grupo)) + 
+    labs(x = "RATING", y = "BOX OFFICE")
+```
+
+
+

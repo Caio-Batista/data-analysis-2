@@ -1,0 +1,121 @@
+---
+title: "Lab 2 - Parte 2"
+author: "Caio Oliveira"
+date: "June 13, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+runtime: shiny
+---
+<h1>Laboratório 2, Parte 2: Uma visualização interativa</h1>
+<h2>Tema: Análise dos dados do IMDB</h2>
+....
+
+```{r setup, include=FALSE}
+library(shiny)
+library(datasets)
+library(rmdexamples)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(rsconnect)
+
+
+options(scipen=999)
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Tratamento inicial dos dados e explicação da escolha dos dados
+
+<h4>Escolhi 10 séries que tem mais fãs atualmente, principalmente aqui no Brasil e decidi neste laboratório comparar todas as demais e entre elas mesmas, no intuito de responder a pergunta "Como estão as séries que eu mais acompanho comparadas as outras?" o que motiva a escolha das outras duas apresentações interativas que fazem a continuação dessa análise de forma individual e depois em grupo, na forma do gráfico Boxplot. Esse laboratório envolveu variáveis como UserVotes, UserRating além de variáveis usadas para os gráficos (medianas e quartis).</h4>
+
+
+```{r}
+#setwd("~/data-analysis-2/ad1/lab1")
+data <-  read.csv("series_from_imdb.csv")
+series.1 <- data %>% filter(series_name %in% c("House of Cards", "Sense8", "13 Reasons Why", "Daredevil", "Gotham", "Arrow", "The Simpsons", "Game of Thrones", "Vikings", "How to Get Away with Murder"))
+
+a <- data.frame(data$series_name, data$UserVotes)
+a <- na.omit(a)
+colnames(a)[1] <- "name"
+colnames(a)[2] <- "UserVotes"
+
+
+rate.series <- data.frame(data$series_name, data$UserRating)
+rate.series <- na.omit(rate.series)
+colnames(rate.series)[1] <- "name"
+colnames(rate.series)[2] <- "rating"
+
+rate.selected <- data.frame(series.1$series_name, series.1$UserRating)
+rate.selected <- na.omit(rate.series)
+colnames(rate.series)[1] <- "name"
+colnames(rate.series)[2] <- "rating"
+
+series.per.vote <- a %>% 
+  group_by(name) %>%
+  summarise(votos = sum(UserVotes)) 
+series.per.vote <- na.omit(series.per.vote) 
+
+
+```
+
+
+## Controle de intervalo
+
+<h4>A ideia dessa visualização interativa é vermos uma quantidade certa de séries e ajustar o eixo x com a quantidade de votos que desejamos ver. Caso a série não apareça com a barra é porque o intervalo é pequeno demais para a quantidade de votos que ela tem. Aqui foi utilizado o USerVotes somados de cada série.</h4>
+
+```{r eruptions, echo=FALSE}
+
+inputPanel(
+  selectInput("n_breaks", label = "Numero de series:",
+              choices = seq(10, 31, by=1), selected = 10),
+  
+  sliderInput("bw_adjust", label = "Ajuste de intervalo:",
+              min = 0, max = 1400000, value = 240000 , step = 10000)
+)
+
+
+renderPlot({
+  
+  least.voted <- head(series.per.vote[order(series.per.vote$votos, decreasing = FALSE), ], n = input$n_breaks)
+  most.voted <- head(series.per.vote[order(series.per.vote$votos, decreasing = TRUE), ], n = input$n_breaks)
+
+  
+  
+  ggplot(arrange(least.voted, votos), aes(name, votos, colour = name)) + geom_col(aes(fill=name)) + ylim(0, input$bw_adjust)  + geom_smooth(method="lm") + coord_flip() + ggtitle("Séries menos votadas pelos usuários (UserVotes)")
+
+})
+```
+
+
+## PLOT individual 
+
+<h4>Após a observação no ultimo gráfico podemos ver aqui o comportamento individual de cada série e sua distribuição no rating de votos de cada episódio pelos usuários. Aqui foi usado o UserRating de cada série, além de mediana e todas as variáveis necessárias para o boxplot.</h4>
+
+```{r, echo=FALSE}
+inputPanel(
+  selectInput("nome_escolhido", label = "Nome da serie:",
+              choices = series.per.vote$name, selected = "Daredevil")
+  )
+
+renderPlot({
+  
+  temp.serie <- rate.series %>%
+    filter(name == input$nome_escolhido)
+  
+  ggplot(temp.serie, aes(x = name, y = rating)) +
+        geom_boxplot() + geom_jitter()
+  
+})
+```
+
+
+## PLOT em conjunto 
+
+<h4>E aqui para encerrar podemos ver o mesmo comportamento de distribuição e variância de notas do UserRating para cada série e compara-la com as demais, ainda podendo filtra-las e dar zoom e algum intervalo de interesse. Foram usadas todas as variáveis do plot anterior, porém para todas as séries ao mesmo tempo.</h4>
+
+```{r, warning=FALSE}
+p <- plot_ly(y = ~rate.selected$rating,x = ~rate.selected$name, color = ~rate.selected$name,type = "box") 
+p
+```
+
