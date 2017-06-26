@@ -1,0 +1,177 @@
+---
+title: "Análise medição ADSD"
+author: "Caio Oliveira"
+date: "June 24, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+---
+# 1- INDRODUÇÃO E ANÁLISE INICIAL
+
+Para o projeto de medição da disciplina de ADSD decidimos fazer a medição de requisição e resposta do sistema [Deciframe](http://ciframe.herokuapp.com/). Não vamos nos ater a descrição dos fatores em si aqui pois já foram especificados. Aqui nesse estudo foram divididos de duas formas principais: Servidor e cliente. Cada uma delas tem os tempos de requisição e resposta específicos, para diferentes situações. E para o caso do Cliente em particular existe o com paralelismo de requisições e sem paralelismo. A principal variável é <b>diff</b>, a diferença entre a requisição e a resposta. 
+
+```{r setup, include=FALSE}
+library(shiny)
+library(datasets)
+library(rmdexamples)
+library(dplyr)
+library(ggplot2)
+library(plotly)
+options(scipen=999)
+cliente.local <- read.csv("local.csv")
+cliente.remoto <- read.csv("remoto.csv")
+
+servidor <- read.csv("server.csv")
+
+cliente.local$categoria <- "remoto"
+cliente.remoto$categoria <- "local"
+cliente <- rbind(cliente.local,cliente.remoto)
+
+
+
+local.paralelo.1 <- read.csv("client/local_paralelo/1_local_paralelo.csv")
+local.paralelo.1$`Local Paralelo` <- "1"
+local.paralelo.2 <- read.csv("client/local_paralelo/2_local_paralelo.csv")
+local.paralelo.2$`Local Paralelo` <- "2"
+local.paralelo.3 <- read.csv("client/local_paralelo/3_local_paralelo.csv")
+local.paralelo.3$`Local Paralelo` <- "3"
+local.paralelo.4 <- read.csv("client/local_paralelo/4_local_paralelo.csv")
+local.paralelo.4$`Local Paralelo` <- "4"
+local.paralelo.5 <- read.csv("client/local_paralelo/5_local_paralelo.csv")
+local.paralelo.5$`Local Paralelo` <- "5"
+
+local.paralelo <- rbind(local.paralelo.1,rbind(local.paralelo.2,rbind(local.paralelo.3,rbind(local.paralelo.4,local.paralelo.5))))
+
+
+
+remoto.paralelo.1 <- read.csv("client/remoto_paralelo/1_remoto_paralelo.csv")
+remoto.paralelo.1$`Remoto Paralelo` <- "1"
+remoto.paralelo.2 <- read.csv("client/remoto_paralelo/2_remoto_paralelo.csv")
+remoto.paralelo.2$`Remoto Paralelo` <- "2"
+remoto.paralelo.3 <- read.csv("client/remoto_paralelo/3_remoto_paralelo.csv")
+remoto.paralelo.3$`Remoto Paralelo` <- "3"
+remoto.paralelo.4 <- read.csv("client/remoto_paralelo/4_remoto_paralelo.csv")
+remoto.paralelo.4$`Remoto Paralelo` <- "4"
+remoto.paralelo.5 <- read.csv("client/remoto_paralelo/5_remoto_paralelo.csv")
+remoto.paralelo.5$`Remoto Paralelo` <- "5"
+
+remoto.paralelo <- rbind(remoto.paralelo.1,rbind(remoto.paralelo.2,rbind(remoto.paralelo.3,rbind(remoto.paralelo.4,remoto.paralelo.5))))
+
+
+
+```
+
+# 2- CLIENTE
+
+<p>Nesta sessão estamos analisando os dados provenientes da parte cliente do sistema, a que faz as requisições e recebe as respostas. Dividimos essa parte em <b>remota</b> e <b>local</b>, cada uma delas contendo paralelismo (será explicado mais a frente) ou não. Em relação aos dados, acreditamos que nossas métricas para o Cliente não necessitavam de análise do tipo de requisição, diferentemente do Servidor, mas principalmente desse intervalo entre a requisição e a resposta.</p>
+
+## Sem paralelismo
+
+<p>A primeira análise foi feita em cima dos dados sem paralelismo do Cliente remoto e local, vamos comparar a variável <b>diff</b> em sua variância e distribuição para cada uma das categorias utilizando o Boxplot que é uma das melhores maneiras de visualizarmos essas informações.</p> 
+<p>E observando os resultados do Boxplot vemos que o Cliente local tem um tempo menor entre a resposta e a requisição, com uma mediana que difere em 10% do Cliente remoto.</p>
+
+```{r,   echo=FALSE}
+
+plot.local <- cliente %>%
+  ggplot(aes(x=categoria,y=diff, group = categoria, color = categoria)) + geom_boxplot()
+ggplotly(plot.local)
+
+```
+
+<p>Ainda olhando para os mesmos dados sem paralelismo, podemos utilizar outra visualização, em forma de gráfico de linhas, com sobreposição. Nesse gráfico vemos durante as <b>N</b> requisições usadas no sistema, o comportamento para a outra variável <b>diff</b>, que foi comentada anteriormente. Cada uma das linhas é um tipo de Cliente.</p>
+<p>A análise que podemos fazer aqui é que ao longo das N requisições o Cliente local, em relação ao menor tempo de resposta, domina em quase 80%. O que faz bastante sentido pois o requisições locais deveriam ter menor tempo, pois passam por menos roteadores, consequentemente o caminho é menor.</p>
+
+```{r,   echo=FALSE}
+# g<-ggplot(data=cliente,
+#        aes(x=n, y=diff, colour=categoria)) +
+#        geom_line()
+# ggplotly(g)
+p <- plot_ly(cliente.local, x = ~n, y = ~diff, name = 'Remoto', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = cliente.remoto$diff, name = 'Local', mode = 'lines')
+p
+```
+
+
+## Paralelo
+
+<p>O mesmo tipo de paralelismo se aplica tanto a Cliente como para Servidor. Nesse paralelismo foram iniciados 5 scripts os quais faziam requisição e coletavam os dados paralelamente para o mesmo servidor, afim de avaliarmos se existia algum gargalo para resposta ou priorização.</p>
+<p>Esse experimento de medição também foi feito para Cliente local e remoto.</p>
+
+### local paralelo
+
+<p>Aqui podemos ver o boxplot novamente para cada um dos scripts separadamente. O que concluimos rapidamente é que existe uma similaridade muito grande entre os dados e pouquissima variância (retirando os outliers). Logo não existe priorização e o sistema consegue balancear bem até 5 Clients fazendo requisições por milissegundo.</p>
+
+
+```{r,   echo=FALSE}
+plot.paralelo <- local.paralelo %>%
+  ggplot(aes(x=`Local Paralelo`,y=diff, group = `Local Paralelo`, color = `Local Paralelo`)) + geom_boxplot()
+ggplotly(plot.paralelo)
+
+```
+
+<p>O gráfico de linhas foi feito só para termos a comparação ao longo das requisições, porém como nenhum dos scripts se destacou de forma extraordinária positivamente ou negativamente as linhas se confundem, sendo difícil diferenciar uma majoritariedade.<p>
+```{r,   echo=FALSE}
+p <- plot_ly(local.paralelo.1, x = ~n, y = ~diff, name = '1', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = local.paralelo.2$diff, name = '2', mode = 'lines') %>%
+  add_trace(y = local.paralelo.3$diff, name = '3', mode = 'lines') %>%
+  add_trace(y = local.paralelo.4$diff, name = '4', mode = 'lines') %>%
+  add_trace(y = local.paralelo.5$diff, name = '5', mode = 'lines') 
+p
+```
+
+
+### remoto paralelo
+
+<p>Acreditavamos que esse teste para o Cliente remoto seria uma diferença considerável, porém não o foi. Acontece que a mudança de remoto para local é bem sutil, a tal modo que graficamente não é facilmente reconhecida. O comportamento dos boxplots nesse caso também é muito parecido com o local, pouca variância e praticamente a mesma mediana de todos.</p>
+
+```{r,   echo=FALSE}
+plot.paralelo <- remoto.paralelo %>%
+  ggplot(aes(x=`Remoto Paralelo`,y=diff, group = `Remoto Paralelo`, color = `Remoto Paralelo`)) + geom_boxplot()
+ggplotly(plot.paralelo)
+
+```
+<p>Uma vantagem deste gráfico de linha é que em comparação com o anterior podemos perceber que o intervalo entre a 30° e 40° requisição o intervalo ficou maior por mais tempo no Cliente remoto do que no local.</p> 
+
+```{r,   echo=FALSE}
+p <- plot_ly(remoto.paralelo.1, x = ~n, y = ~diff, name = '1', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = remoto.paralelo.2$diff, name = '2', mode = 'lines') %>%
+  add_trace(y = remoto.paralelo.3$diff, name = '3', mode = 'lines') %>%
+  add_trace(y = remoto.paralelo.4$diff, name = '4', mode = 'lines') %>%
+  add_trace(y = remoto.paralelo.5$diff, name = '5', mode = 'lines') 
+p
+```
+
+
+# 3- SERVIDOR 
+
+<p>Para o Servidor não fazia sentido para nós testes paralelos, entretanto uma das nossas métricas era a comparação entre os tipos de requisição para avaliarmos a demora da resposta do Servidor em cada uma delas.</p>
+<p>O primeiro gráfico que nos ajuda a perceber a diferença de tempo entre os três tipos de requisições é o boxplot. Para cada requisição existe um boxplot da variável <b>diff</b>. Entretanto quando começamos a avaliar vimos que a diferença era muito pequena para ser notada em uma escala normal. Então achamos melhor para esse caso normalizar o gráfico e deixar em destaque o que diferencia as requisições.</p>
+<p>Com isso podemos perceber que para a requisição <b>get_pagina</b> é quase imediata a resposta. Já para a <b>get_similares</b> a diferença bem maior pois exige a chamada de outras requisições para dar resposta. O que fazia sentido pela nossa suposição, já era esperado.</p>
+
+```{r, echo=FALSE}
+
+apply.filtro <- servidor %>%
+  filter(metodo == "apply_filtro")
+
+get.pagina <- servidor %>%
+  filter(metodo == "get_pagina")
+
+get.similares <- servidor %>%
+  filter(metodo == "get_similares")
+
+plot.servidor <- servidor %>%
+  ggplot(aes(x=metodo,y=diff, group = metodo, color = metodo)) + geom_boxplot() + scale_y_log10()
+ggplotly(plot.servidor)
+```
+<p>Aqui um gráfico de linhas sobrepostas, podemos notar a diferença de valores que é muito grande entre as requisições. Deixando em evidência o <b>get_similares</b>.</p>
+
+```{r,  echo=FALSE}
+metodos.plot <- plot_ly(apply.filtro, y = ~diff, name = 'apply_filtro', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = get.pagina$diff, name = 'get_pagina', mode = 'lines') %>%
+  add_trace(y = get.similares$diff, name = 'get_similar', mode = 'lines')
+metodos.plot
+```
+
+
+
