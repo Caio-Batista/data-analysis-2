@@ -1,0 +1,272 @@
+---
+title: "Lab 03 - Parte 2"
+author: "Caio Oliveira"
+date: "June 26, 2017"
+output: 
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse, warn.conflicts = F)
+library(rvest)
+library(plotly)
+library(cluster)
+library(ggdendro)
+library(readr)
+theme_set(theme_light())
+source("plota_solucoes_hclust.R")
+require(GGally, quietly = TRUE)
+require(reshape2, quietly = TRUE)
+require(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(ggfortify)
+library(cluster)
+library(ggdendro)
+library(broom)
+theme_set(theme_bw())
+source("github-lib.R")
+```
+
+# Tema: Agrupamento de mais dados em mais dimensões
+## Dados: UFCG - Sumarizados por UA e completos
+....
+
+# 1 - TRATAMENTO E DIVISÃO DOS DADOS
+
+<p>Para este laboratório os dados que foram escolhidos são da UFCG e pertencem ao primeiro caso o qual o professor citou na explicação deste relatório. Esses dados podem ser encontrados [aqui](https://github.com/nazareno/tamanhos-da-ufcg).</p>
+<p>Em relação ao tratamnto e a divisão dos dados aqui foi feita em duas partes principais. A primeira usa os dados completos da UFCG e foi feita uma análise para tentar ajudar na divisão de grupos e clusterização da segunda parte, que é justamente os dados sumarizados das unidades acadêmicas. Já nessa segunda parte é usado k-means para se fazer a clusterização. Além de no final após ter sido atribuido um valor para k, foi calculado o os melhores valores de K através de aritmética simples e testado para o cenário dos dados. Tirando a dúvida assim da melhor quantidade de grupos.</p>
+
+```{r}
+
+setwd("~/data-analysis-2/ad1/lab3/")
+data <- read_csv("ufcg-201704-unidades-academicas-filtradas.csv", col_types = cols(INGRESSO_SERVICOPUBLICO = col_date()))
+data <- na.omit(data)
+
+summ.ua <- read.csv("sumario-ua.csv") 
+
+professores <- data %>%
+  filter(DESCRICAO_CARGO == "PROFESSOR DO MAGISTERIO SUPERIOR")
+
+```
+
+
+# 2 - DADOS COMPLETOS
+
+<p>Nssa parte do laboratório foi utilizado os dados complestos dos funcionários da UFCG, que podem ser encontrados [aqui](https://github.com/nazareno/tamanhos-da-ufcg/blob/master/ufcg-201704-unidades-academicas-filtradas.csv). A idéia principal dessa sessão é que analisando esses dados, possamos ter uma base e decidir um valor significativo para o K-númedo de clusters no dataset da sessão seguinte.</p>
+
+## Quando começaram a ser professores?
+
+<p>Primeiramente foi feita uma filtragem nos dados utilizados para que ficassem só os professores no dataset. Além disso foi utilizada uma variável específica aqui <b>INGRESSO_SERVICOPUBLICO</b> (data de ingresso como funcionário na universidade).</p>
+<p>Essa primeira pergunta que pode nos ajudar a decidir a quantidade de grupos a ser usada é bem útil pois podemos ver se existe algum comportamento em comum entre os professores durante algum período de tempo.<p/>
+<p>Para isso foi utilizado o gráfico de dispersão em uma dimensão. E pudemos concluir que existem pelo menos 3 grupos definidos de entrada de professores na UFCG. Entretanto não é suficiente para atribuir um valor à K.</p>
+
+```{r}
+professores %>% 
+    ggplot(aes(x = "Professores", y = INGRESSO_SERVICOPUBLICO)) + scale_y_date() + theme_bw() + 
+    geom_jitter(width = .01, height = 0, size = 2, alpha = .6)
+```
+
+## Agrupamento em histograma
+
+<p>Uma outra maneira fácil de identificarmos grupos é com o agrupamento no histograma. Então aqui foi utilizada a variável mencionada no gráfico anterior no eixo X, já que no eixo Y fica a contagem de professores que entrou naquela mesma data.</p>
+<p>A conclusão dessa visualização é que vemos períodos bem definidos de entrada de professores, sendo eles 4 grupos. Vemos um crescimento consideravel depois de <b>2002</b>, qu foi o ano que a UFPB-campus CG se tornou UFCG.</p>
+
+```{r, warning=FALSE}
+professores %>% 
+    ggplot(aes(x = INGRESSO_SERVICOPUBLICO))  +
+    geom_histogram(bins = 30) + 
+    geom_rug()
+    
+```
+
+## Normalização
+
+<p>Um ultimo recurso de agrupamento poderia ser feito normalizando o histograma. Entretanto o resultado não ajudou tanto a visualização de grupos, inclusive um dos grupos mostrado no gráfico anterior é suprimido por essa normalização.</p>
+
+```{r, warning=FALSE}
+professores %>% 
+    ggplot(aes(x = INGRESSO_SERVICOPUBLICO))  +
+    geom_histogram(bins = 30)  +
+    scale_y_log10() +
+    geom_rug()
+    
+```
+
+
+## Números por departamento
+
+<p>Como a ideia da próxima sessão é utilizar os dados por unidade acadêmica a melhor coisa a se fazer é primeiro visualizar os dados de uma forma que ajude a conhecer o contexto tratado. E qual melhor forma de conhecer a universidade que conhecendo seus professores?</p>
+<p>A ideia aqui é utilizar o histograma novamente mas dessa vez só para contabilizar a quandidade de professores e vermos se isso reflete na universidade e se tem algo a ver com a quantidade de novos professores de 2000 até 2017 .</p>
+<p>A conclusão é a força que o curso de medicina teve durante esses anos e o setor separado para saúde proporciona e necessita de um corpo doscente maior. Computação esta em 9° lugar nessa contagem</p>
+
+```{r, warning=FALSE}
+professores <- within(professores, 
+                   UORG_EXERCICIO <- factor(UORG_EXERCICIO, 
+                                      levels=names(sort(table(UORG_EXERCICIO), 
+                                                        decreasing=FALSE))))
+professores %>%
+  ggplot(aes(x=UORG_EXERCICIO)) + geom_histogram(stat = "count") + geom_point(stat = "count") + coord_flip()
+```
+
+
+# 3 - DADOS POR UNIDADE ACADÊMICA
+
+<p>Aqui foram utilizados os [dados das unidades acadêmicas sumarizados](https://github.com/nazareno/tamanhos-da-ufcg/blob/master/ufcg-201704-sumario-UAs-wide.csv). Os quais foram empregados o propósito de separação em grupos de acordo com o que foi analisado nas sessões anteriores.</p>
+<p>Os valores atribuidos para K foram <b>3</b> e <b>4</b> pelas conclusões que obtive nas visualizações anteriores. Nessa sessão também usaremos <b>k-means</b> ao invés de <b>hclust</b>, como foi recomendado pelo professor na descrição do laboratório.</p>
+
+## Correlação de fatores
+
+<p>A primeira coisa que podemos analisar é a correlação entre as variáveis do dataset, o quais foram tiradas duas variáveis: <b>Outro</b> e <b>UORG_LOTAÇÃO</b>. O primeiro por não existir uma definição que seja realmente professor do departamento e o segundo por não ser uma variável numérica, sendo assim inviável a correlação.</p>
+<p>Apesar de quase não existir correlação entre a mediana das idades gerais e a quantidade de professores 40 horas, essas duas variáveis serão analisadas mais a frente.</p>
+
+```{r, warning=FALSE}
+
+
+summ.ua %>% 
+    select(-Outro,-UORG_LOTACAO) %>% 
+    ggpairs(cardinality_threshold = 50) 
+
+ua.scaled <- summ.ua %>% 
+    select(-Outro,-UORG_LOTACAO)
+
+
+```
+
+
+## K-means
+
+<p>Vamos utilizar o método k-means que  calcula as médias dos pontos para centro dos seus clusters e para o geral dos dados. O <b>k</b> simboliza justamente essa quantidade de grupos(clusters) que são reconhecidos pelo método.</p>
+
+### com 3 grupos 
+
+<p>O primeiro valor atribuido a <b>k</b> foi 3 pois, como o primeiro scatterplot mostrou durante os anos existem 3 grandes concentrações de entradas de professores na UFCG. Então aqui a ideia foi atribuir as variáveis do dataset pesos e atribuir os valores a uma nova variável chamada <b>.cluster</b> o qual posicionará os elementos em um outro scatterplot geral com os cluster divididos por cores.</p>
+<p>A conclusão desse gráfico foi que existem sim 3 grupos bem definidos nos dados, que podem ser observados por ocuparem partes bem diferentes do gráfico. O primeiro concentrado na parte negativa dos dois eixos, completamente o oposto do terceiro. E o segundo que fica na parte negativa do eixo Y mas positiva do eixo X.</p>
+
+
+```{r, warning=FALSE}
+n_clusters <- 3
+dw2.scaled <- ua.scaled 
+
+km = ua.scaled %>% 
+    kmeans(centers = n_clusters, nstart = 20)
+
+dw2.scaled.km.long = km %>% 
+    augment(dw2.scaled) %>% 
+    gather(key = "variável", 
+           value = "valor") 
+
+
+autoplot(km, data = dw2.scaled, label = TRUE)
+dists = dw2.scaled %>% dist() 
+plot(silhouette(km$cluster, dists), col = RColorBrewer::brewer.pal(n_clusters, "Set2"))
+
+```
+
+
+### com 4 grupos
+
+<p>No caso para o valor de <b>k</b> igual a 4 a ideia era fazer um scatterplot mas com variáveis bem definidas, sendo elas: <b>idade_mediana</b>(tempo de serviço) e <b>Professor.40h.ou.DE</b>.</p>
+<p>Utilizando o <b>k-means</b> foi o melhor resultado de divisão com esse valor pois, podemos ver e definir bem os 4 grupos encontrados.</p>
+<p><b>Grupo 1 - Dinossauros:</b> Departamentos com professores muito antigos na universidade e que tem uma média boa de representantes na universidade.</p>
+<p><b>Grupo 2 - Feras:</b> Departamentos com poucos professores e ainda bem novos na universidade.</p> 
+<p><b>Grupo 3 - Bolas:</b> Departamento com o maior número de professores na universidade, entretanto a experiência e os anos de ensino em relação ao panorama geral está na média.</p> 
+<p><b>Grupo 4 - Na media:</b> Departamentos com quantidade e anos de experiência na média.</p>
+
+```{r, warning=FALSE}
+
+summario_t <- summ.ua  %>% 
+    select(-Outro) %>% 
+    mutate_each(funs(as.vector(scale(.))), Professor.40h.ou.DE, idade_mediana)
+
+atribuicoes = tibble(k = 1:4) %>% 
+    group_by(k) %>% 
+    do(kmeans(select(summario_t, idade_mediana, Professor.40h.ou.DE), 
+              centers = .$k, 
+              nstart = 10) %>% augment(summ.ua)) # alterne entre filmes e filmes_t no augment  
+
+atribuicoes_long = atribuicoes %>% 
+    gather(key = "variavel", value = "valor", -UORG_LOTACAO, -k, -.cluster, -Outro) 
+
+atribuicoes %>%
+    ggplot(aes(x = idade_mediana, y = Professor.40h.ou.DE, label = UORG_LOTACAO, colour = .cluster)) + 
+    geom_point() + 
+    facet_wrap(~ k)
+
+# A silhoueta
+dists = select(summario_t, idade_mediana, Professor.40h.ou.DE) %>% dist()
+km = kmeans(select(summario_t, idade_mediana, Professor.40h.ou.DE), 
+            centers = 4, 
+            nstart = 10) 
+
+silhouette(km$cluster, dists) %>% 
+    plot(col = RColorBrewer::brewer.pal(4, "Set2"))
+```
+
+### calculando melhor k
+
+<p>Mesmo com um bom entendimento dos grupos podemos melhorar a escolha do valor de <b>k</b> utilizando um metodo <b>betweenss/totss</b> no k-means.</p>
+<p><b>betweenss</b> é o somatório para cada grupo da distância do centro de cada cluster para o centro dos dados e multiplicado pelo número de pontos nesse mesmo cluster. Já o <b>totss</b> é somatório total das distâncias dos pontos para o centro dos dados.</p>
+<p>Podemos ver esse comportamento com a junção do scatterplot com uma linha de conexão entre os pontos.</p>
+
+```{r}
+set.seed(123)
+explorando_k = tibble(k = 1:15) %>% 
+    group_by(k) %>% 
+    do(
+        kmeans(select(summario_t, -UORG_LOTACAO), 
+               centers = .$k, 
+               nstart = 20) %>% glance()
+    )
+
+explorando_k %>% 
+    ggplot(aes(x = k, y = betweenss / totss)) + 
+    geom_line() + 
+    geom_point()
+```
+
+### simulação com ultimo k crescente
+
+<p>O melhor <b>k</b> possível é o ultimo valor crescente no gráfico anterior. Sendo assim o valor aplicado aqui é 12.</p>
+<p>Basicamente a conclusão deste valor para <b>k</b> é que os 4 grupos que foram usados na sessão anterior foram divididos em mais 3 cada um formando esses grupos atuais. Mas a lógica continua a mesma, só ficam mais separados e com mais detalhes.<p>
+
+
+```{r, warning=FALSE}
+atribuicoes = tibble(k = 1:12) %>% 
+    group_by(k) %>% 
+    do(kmeans(select(summario_t, idade_mediana, Professor.40h.ou.DE), 
+              centers = .$k, 
+              nstart = 10) %>% augment(summ.ua))   
+
+atribuicoes_long = atribuicoes %>% 
+    gather(key = "variavel", value = "valor", -UORG_LOTACAO, -k, -.cluster, -Outro) 
+
+atribuicoes %>%
+    ggplot(aes(x = idade_mediana, y = Professor.40h.ou.DE, label = UORG_LOTACAO, colour = .cluster)) + 
+    geom_point() + 
+    facet_wrap(~ k)
+
+dists = select(summario_t, idade_mediana, Professor.40h.ou.DE) %>% dist()
+km = kmeans(select(summario_t, idade_mediana, Professor.40h.ou.DE), 
+            centers = 4, 
+            nstart = 10) 
+
+silhouette(km$cluster, dists) %>% 
+    plot(col = RColorBrewer::brewer.pal(4, "Set2"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
