@@ -1,0 +1,180 @@
+---
+title: "Lab 04 - Parte 1"
+author: "Caio Oliveira"
+date: "June 28, 2017"
+output:
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+# Tema: Você e um problema pequeno
+## Dados: Opiniões sobre filmes (small)
+
+....
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(readr)
+library(tidyverse, warn.conflicts = F)
+library(rvest)
+library(plotly)
+library(cluster)
+library(ggdendro)
+require(GGally, quietly = TRUE)
+require(reshape2, quietly = TRUE)
+require(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(ggfortify)
+library(cluster)
+library(ggdendro)
+library(broom)
+```
+
+# TRILOGIA MATRIX
+
+<p>Ordem dos filmes: <b>The Matrix</b>, <b>The Matrix: Reloaded</b>, <b>The Matrix: Revolutions</b>.<p>
+<p>Escolhi falar aqui sobre uma das minhas trilogias favoritas: Matrix. Esse filme que mistura muito Sci-fi com Ação, muitas artes marciais, cenas surreais envolvendo desvios de balas, além de para-las no ar tem várias interpretações diferentes, sobre como o homem fica imerso na sociedade a ponto de ser apenas uma bateria descartável para ela. Outras interpretações ainda falam sobre a forma como o homem está submisso a sociedade de consumo e como isso irá destruir o nosso mundo, como a realidade que eles vivem no filme e ainda que o filme é um Conto da caverna (Platão) contemporâneo.</p>
+![](http://31.media.tumblr.com/da2cdd84269bb3acf490b9a66c1c7ac2/tumblr_mrtrxzzaGA1sq2ljmo1_500.gif)
+<p>Seja qual a interpretação que for é uma trilogia muito bem fechada com roteiro excelente e elenco ainda melhor. Uma verdadeira história do Homem vs Maquina e o Homem contra ele mesmo, suas dúvidas e principalmente as consequências das suas escolhas.</p>
+![](http://i.imgur.com/7NpbhfW.gif) 
+
+....
+
+## Tratamento dos dados
+
+<p>Para o tratamento inicial dos dados temos que isolar os filmes dessa trilogia do restante dos filmes. Entretanto já pensando nas próximas sessões, que serão comparativos gerais, a ideia é criar uma nova coluna contendo o número de gêneros naquele filme em questão pois, isso facilitará na hora de fazermos comparação de média e distribuição de notas depois.</p>
+<p>Apesar de existirem 4 arquivos com os dados dos filmes, para esse laboratório, só foi necessário dois deles: <b>ratings</b> e <b>movies</b>.</p>
+<p>As informações mais relevantes de <b>ratings</b> eram principalmente o id do filme (<b>movieId</b>) e o próprio voto dos usuários (<b>rating</b>). Já para o <b>movies</b> as principais eram o título do filme (<b>title</b>), o id do filme também (<b>movieId</b>) e os gêneros os quais o filme se encaixa (<b>genres</b>).</p>
+<p>Então os dois csv foram usados para formar um novo dataframe que contém as informações dos dois antigos, chamado <b>merged</b>. Esse df também foi usado para a criação da nova coluna com a quantidade de gêneros. Todas as variações abaixo só foram colunas que precisavam ter formatos diferentes dos dados.</p>
+
+```{r}
+links <- read.csv("dados/links.csv")
+movies.factor <- read.csv("dados/movies.csv")
+ratings <- read.csv("dados/ratings.csv")
+tags <- read.csv("dados/tags.csv")
+
+movies.str <- read_csv("dados/movies.csv", col_types = cols(genres = col_character()))
+
+merged <- merge(ratings,movies.factor,by = "movieId")
+merged.str <- merge(ratings,movies.str,by = "movieId")
+matrix.trilogia <- merged[grep("Matrix", merged$title), ]
+
+means <- matrix.trilogia %>%
+  select(title,rating)
+names(means)[1] <- "title"
+names(means)[2] <- "rating"
+
+means <- means %>% 
+  group_by(title) %>%
+  mutate(rating = mean(rating)) 
+means <- means[match(unique(means$title),means$title),]
+
+numero_generos.completo <- merged.str %>%
+  mutate(n_generos = vapply(strsplit(merged.str$genres, "\\W+"), length, integer(1)))
+
+```
+
+## Variância e distribuição das notas
+
+<p>Vamos analisar primeiramente a variação das notas e suas medianas para essa trilogia, e comprovar de vez qual o filme que os usuários mais gostam e consequentemente deram melhores notas.</p>
+<p>O primeiro gráfico para ajudar nesse estudo é o boxplot. Aqui existe um para cada filme da trilogia, e já podemos comprovar o que em casos de muitos outros filmes é verdadeiro: O primeiro filme é o mais impactante.</p>
+<p>O primeiro filme tem a mediana maior que os outros dois e isso é facil de entender pois, o filme foi muito inovador para a época, além de trazer uma ideia muito extrema de mundo pós-apocaliptico misturado com ação/artes marciais. Isso chocou muitas pessoas na época que acharam o filme uma verdadeira revolução do cinema. Entretanto esse hype causou a queda das notas nos outros dois filmes que se esperava que fosse tão inovador quanto o primeiro, so que os criadores mantiveram a mesma ideia.</p>
+
+```{r}
+matrix.trilogia %>% 
+  ggplot(aes(x=title,y=rating, group = title, color = title)) + geom_boxplot()  + coord_flip()
+```
+
+## Outra visualização de dispersão 
+
+<p>Outra forma de vermos as mesmas variáveis mas para analisarmos outro aspecto é o Violinplot.</p>
+<p>Nesse tipo de gráfico vemos principalmente onde os pontos, que correspondem as notas, se concentram e podemos ver se os usuários votaram de forma equilibrada ou apenas alguns que deram notas baixas, o mesmo se aplicanto a notas altas.</p>
+<p>A conclusão desse gráfico é que para o primeiro filme vemos a concentração de pontos acima da nota 3, o que não é o mesmo comportamento do ultimo filme (<b>The Matrix: Revolutions</b>), o qual tem uma distribuição quase uniforme durante o eixo X todo. Isso mostra que os usuários divergiram muito de opinião sobre o quão bom foi o filme.</p>
+
+```{r}
+matrix.trilogia %>% 
+  ggplot(aes(x=title,y=rating, group = title, color = title)) + geom_violin()  + coord_flip()
+
+```
+
+## E na média?
+
+<p>Nos gráficos anteriores estávamos focados apenas na mediana e na distribuição das notas mas a média também é um fator importante a ser analisado, por isso o gráfico de barras é util para estudarmos esse fator.<p>
+<p>Esse gráfico nos mostra uma diferença bem menor que nos anteriores, principalmente quando vemos em relação ao segundo e ao terceiro filme. Os dois tem um comportamento bem parecido, mas o primeiro ainda continua bem a frente nos votos.</p>
+
+```{r}
+means %>%
+  ggplot(aes(x=title, y=rating, color = title)) + geom_col() + geom_point() + coord_flip()
+```
+
+
+# PANORAMA GERAL - DADOS COMPLETOS
+
+<p>Analisar os dados da sua trilogia favorita é muito bom, mas faz crescer um pensamento sobre os filmes em geral: Será que existe alguma quantidade de gêneros em que um filme se encaixa que isso faz ele receber notas melhores?<p>
+<p>É dedicado a esse questionamento que essa sessão foi criada e foi necessário a criação de uma nova coluna no dataframe que está sendo manipulado pois, o ideal é termos o número de gêneros para cada filmes/avaliação e não o nome do gênero em si.</p>
+<p>Dentro do dataframe foi criada a colune <b>n_generos</b> que contêm a quantidade de gêneros que o filme se encaixa, e essa variável é chave para essa análise a seguir. Os limite inferior dessa variável é 1 e o superior é 11.</p>
+
+## Variância separados por quantidade de generos
+
+<p>Seguindo o raciocínio da sessão anterior podemos ver primeiramente como se comportam as notas em relação a cada quantidade de gêneros, mediana, quartis e a distribuição durante o eixo de forma interativa com esse boxplot.</p>
+<p>Primeiramente vamos desconsiderar a quantidade de gêneros que só aparecem em um filme  (caso do 9, 10 e 11) e analisarmos o resto. Podemos ver que o que tem a maior mediana e concentração de votos na parte superior do eixo é quando <b>n_generos</b> é igual a 8. Para o resto dos valores o comportamento é muito parecido, chegando a ser identico para 1 a 4 e 6, 5 e 7.</p>
+
+```{r}
+ggplotly(numero_generos.completo %>%
+  ggplot(aes(x=n_generos,y=rating, group = n_generos)) + geom_boxplot() + scale_x_continuous(breaks=seq(0, 12, by=1)))
+```
+
+
+## Melhor quantidade vs filmes com apenas um gênero 
+
+<p>Agora que sabemos qual a quantidade de generos em um filme que é melhor votada, podemos avaliar se é uma votação justa, do ponto de vista de quantidade de votos. Podemos fazer esse comparativo para quando <b>n_generos</b> é igual a 8 ou a 1, que neste ultimo caso são os filmes que tem apenas um gênero. Para isso utilizaremos dois gráficos de barra divididos por essa categoria citada anteriormente mas que no eixo X é especificamente cada nota e no Y é a quantidade de votos daquela nota.</p>
+<p>Para poder visualizar melhor nesse gráfico você talvez queira clicar em <b>Autoscale</b> pois a quantidade de filmes com 8 gêneros é absurdamente menor do que com apenas 1. Podemos observar aqui que a quantidade de votos para os filmes com 1 gênero é muito maior e isso pode ser um dos colaboradores principais para que a nota baixe.</p>
+
+
+```{r, warning=FALSE}
+generos.8.e.1 <- numero_generos.completo %>%
+  filter(n_generos == 8| n_generos == 1)
+
+generos.8.e.1$n_generos <- as.factor(generos.8.e.1$n_generos)
+generos.8.e.1$rating <- as.factor(generos.8.e.1$rating)
+
+ggplotly(generos.8.e.1 %>%
+  ggplot(aes(x=rating, fill = n_generos)) + geom_histogram(aes(y=..count..), stat = "count") + facet_grid(n_generos~.) 
+)
+```
+
+
+## E na média?
+
+<p>Podemos também usar a média para comparar como se comportam essas mesmas classes de filmes. A ideia é usar um gráfico comum de barrar para a associação ser mais rápida e facil.</p>
+<p>O resultado foi um surpreendente. A expectativa é que essa média para os filmes com apenas um gênero e subisse ainda mais para filmes com 8. Entretanto vemos que as duas médias se aproximaram, diferindo apenas por 0.4 pontos.</p>
+
+```{r}
+means.8.e.1 <- numero_generos.completo %>%
+  select(rating,n_generos)
+
+means.8.e.1$n_generos <- as.factor(means.8.e.1$n_generos)
+
+means.8.e.1 <- means.8.e.1  %>% 
+  filter(n_generos == "1" | n_generos == "8") %>%
+  group_by(n_generos) %>%
+  mutate(rating = mean(rating)) 
+means.8.e.1 <- means.8.e.1[match(unique(means.8.e.1$n_generos),means.8.e.1$n_generos),]
+
+means.8.e.1 %>% ggplot(aes(x=n_generos,y=rating, color = n_generos, fill = n_generos)) + geom_bar(stat="identity")
+```
+
+## Correlação dos fatores
+
+<p>Após todas essas análises podemos pensar se existe mesmo uma relação entre a quantidade de gêneros em um filmes e as notas que ele recebe. Para isso podemos utilizar os dados completos novamente e tentar cruzar as variáveis procurando uma correlação forte entre elas</p>
+<p>Como resultado temos que a correlação é muito fraca, isso quer dizer que não necessariamente um filme que tem muitos gêneros vai ter boas avaliações. Pelo menos esses dados não comprovam isso.</p>
+
+```{r}
+means.8.e.1$n_generos <- as.numeric(means.8.e.1$n_generos)
+numero_generos.completo %>% 
+  select(-title,-genres,-timestamp,-movieId, -userId) %>%
+  ggpairs(cardinality_threshold = 2800)
+```
+
