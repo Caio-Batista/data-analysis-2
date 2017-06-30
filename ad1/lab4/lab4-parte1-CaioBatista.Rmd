@@ -30,6 +30,20 @@ library(ggfortify)
 library(cluster)
 library(ggdendro)
 library(broom)
+
+detach_package <- function(pkg, character.only = FALSE)
+{
+  if(!character.only)
+  {
+    pkg <- deparse(substitute(pkg))
+  }
+  search_item <- paste("package", pkg, sep = ":")
+  while(search_item %in% search())
+  {
+    detach(search_item, unload = TRUE, character.only = TRUE)
+  }
+}
+detach_package(Rmisc)
 ```
 
 # TRILOGIA MATRIX
@@ -50,6 +64,7 @@ library(broom)
 <p>Então os dois csv foram usados para formar um novo dataframe que contém as informações dos dois antigos, chamado <b>merged</b>. Esse df também foi usado para a criação da nova coluna com a quantidade de gêneros. Todas as variações abaixo só foram colunas que precisavam ter formatos diferentes dos dados.</p>
 
 ```{r}
+
 links <- read.csv("dados/links.csv")
 movies.factor <- read.csv("dados/movies.csv")
 ratings <- read.csv("dados/ratings.csv")
@@ -109,6 +124,62 @@ means %>%
   ggplot(aes(x=title, y=rating, color = title)) + geom_col() + geom_point() + coord_flip()
 ```
 
+## Inferência
+
+<p>A parte que importa realmente é agora: Mas e se um novo voto viesse de um usuário? Qual intervalo ele se encaixaria em cada um dos filmes da trilogia?</p>
+<p>Para calcular esse intervalo de confiança (<b>IC</b> ou <b>CI</b> em inglês) precisamos calcular a média (que já possuimos da sessão anterior) a variância e consequentemente o desvio padrão. Podemos também calcular o Erro padrão que é basicamente uma medida estatística muito parecida com o desvio padrão só que indica a diferença da amostra para a população real da variável.</p>
+<p>Aqui temos os dados sumarizados em que <b>sd</b> corresponde ao desvio padrão, <b>se</b> o erro padrão e <b>ci</b> o nosso intervalo de confiança (95%), além disso <b>rating</b> passa a ser média como no ultimo gráfico da sessão anterior. Podemos observar aqui que o <b>ci</b> diminui a medida que o N aumenta, e por que isso?</p>
+<p>A medida que a amostra se aproxima da população, ou seja, cresce, o erro diminui e então a média amostral que temos a partir desse dataset pequeno se aproxima da verdadeira média populacional.</p>
+
+
+
+```{r}
+matrix.trilogia$title <- as.character(matrix.trilogia$title)
+matrix.trilogia$title <- as.factor(matrix.trilogia$title)
+
+matrix.resumed <- Rmisc::summarySE(matrix.trilogia, measurevar="rating", groupvars=c("title"))
+
+
+pd <- position_dodge(0.1) # move them .05 to the left and right
+print(matrix.resumed, row.names = FALSE)
+```
+
+<p>Podemos ver que o intervalo de confiança como essas barras paralelas ao eixo X que estão ao redor dos pontos que representam os filmes. Note o tamanho do intervalo é proporcional ao IC, consequentemente a falta de precisão é muito maior nos dois ultimos filmes do que em relação ao primeiro.<p>
+
+```{r, warning=FALSE}
+
+ggplot(matrix.resumed, aes(x=title, y=rating, colour=title)) + 
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci), width=.1, position=pd) +
+    geom_line(position=pd) + 
+    geom_point(position=pd) + 
+    ylab("Rating") + 
+    scale_y_continuous(breaks=seq(0,6, by=0.5)) + coord_flip()
+```
+
+<p>Já aqui podemos ver através de gráficos de barras o mesmo comportamento só que com uma visualização diferente.<p>
+<p>Nesse primeiro plot a variável que foi somada (e subtraida) da média foi o erro padrão, a qual já foi explicada anteriormente. Note que ela é diretamente proporcional ao intervalo de confiança, os dois são muito parecidos, mas inversamente proporcional a quantidade de avaliações dos filmes.<p>
+
+
+```{r}
+ggplot(matrix.resumed, aes(x=title, y=rating, fill=title)) + 
+    geom_bar(position=position_dodge(), stat="identity") +
+    geom_errorbar(aes(ymin=rating-se, ymax=rating+se),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+
+```
+
+<p>Mesmo gráfico anterior só que aqui vemos o intervalo de confiança e não o erro padrão.</p>
+
+```{r}
+ggplot(matrix.resumed, aes(x=title, y=rating, fill=title)) + 
+    geom_bar(position=position_dodge(), stat="identity") +
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+
+```
+
 
 # PANORAMA GERAL - DADOS COMPLETOS
 
@@ -151,6 +222,8 @@ ggplotly(generos.8.e.1 %>%
 <p>Podemos também usar a média para comparar como se comportam essas mesmas classes de filmes. A ideia é usar um gráfico comum de barrar para a associação ser mais rápida e facil.</p>
 <p>O resultado foi um surpreendente. A expectativa é que essa média para os filmes com apenas um gênero e subisse ainda mais para filmes com 8. Entretanto vemos que as duas médias se aproximaram, diferindo apenas por 0.4 pontos.</p>
 
+
+
 ```{r}
 means.8.e.1 <- numero_generos.completo %>%
   select(rating,n_generos)
@@ -176,5 +249,48 @@ means.8.e.1$n_generos <- as.numeric(means.8.e.1$n_generos)
 numero_generos.completo %>% 
   select(-title,-genres,-timestamp,-movieId, -userId) %>%
   ggpairs(cardinality_threshold = 2800)
+```
+
+## Inferência 
+
+<p>Para os dados gerais que é ainda melhor de analisarmos e fazermos inferências, pois aqui temos os representantes de cada uma das quatidades de gêneros dos filmes. E podemos notar já na sumarização que o intervalo de confiança dos primeiros 4 elementos é muito pequeno, pela sua imensa quantidade de avaliações, notas dadas pelos usuários. Consequentemente olhamos para o erro padrão que também é muito pequeno em relação ao que estava sendo analisado antes com a trilogia de Matrix.</p>
+<p>Aqui as colunas contém as mesmas variáveis que foram explicadas anteriormente para a análise dos filmes de Matrix.</p>
+
+
+```{r, warning=FALSE}
+
+numero_generos.completo$n_generos <- as.character(numero_generos.completo$n_generos)
+generos.resumed <- Rmisc::summarySE(numero_generos.completo, measurevar="rating", groupvars=c("n_generos"))
+generos.resumed <- na.omit(generos.resumed)
+print(generos.resumed, row.names = FALSE)
+```
+
+<p>Nestri gráfico de barras podemos visualizar o quão pequeno são os intervalos de confiança dos filmes que tem menos gêneros em relação aos que têm mais gêneros, por causa justamente da sua maior amostragem. Assim podemos concluir que o intervalo de confiança é quase desprezivel para esses casos, do 1 ao 5.</p>
+
+
+```{r}
+pd <- position_dodge(0.1) # move them .05 to the left and right
+
+ggplot(generos.resumed, aes(x=n_generos, y=rating, fill=n_generos)) + 
+    geom_bar(position=position_dodge(), stat="identity") +
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9))
+```
+
+
+<p>Este scatterplot é um pouco mais dramático, entretanto ajuda bastante a perceber essa diferença acima citada, e principalmente do deslocamente e distância das médias dos votos dos usuários entre as diferentes categorias de gêneros.</p>
+
+```{r, warning=FALSE}
+
+numero_generos.completo$n_generos <- as.numeric(numero_generos.completo$n_generos)
+generos.resumed <- Rmisc::summarySE(numero_generos.completo, measurevar="rating", groupvars=c("n_generos"))
+generos.resumed <- na.omit(generos.resumed)
+
+
+ggplot(generos.resumed, aes(x=n_generos, y=rating, colour=n_generos)) + 
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci), width=.1, position=pd) +
+    geom_line(position=pd) +
+    geom_point(position=pd) + scale_x_continuous(breaks = seq(1,9,by=1))
 ```
 
