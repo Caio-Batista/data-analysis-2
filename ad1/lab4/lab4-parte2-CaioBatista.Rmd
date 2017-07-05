@@ -1,0 +1,267 @@
+---
+title: "Lab 04 - Parte 2"
+author: "Caio Oliveira"
+date: "July 3, 2017"
+output:
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+# Tema: Você e suas perguntas
+## Dados: Opiniões sobre filmes (small)
+
+....
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(readr)
+library(tidyverse, warn.conflicts = F)
+library(rvest)
+library(plotly)
+library(cluster)
+library(ggdendro)
+require(GGally, quietly = TRUE)
+require(reshape2, quietly = TRUE)
+require(tidyverse, quietly = TRUE, warn.conflicts = FALSE)
+library(ggfortify)
+library(cluster)
+library(ggdendro)
+library(broom)
+
+library(boot)
+# function to obtain regression weights 
+bs <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  fit <- lm(formula, data=d)
+  return(coef(fit)) 
+} 
+
+rsq <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample 
+  fit <- glm(formula, data=d)
+  return(summary(fit)$r.square)
+} 
+```
+
+# Escolha das perguntas e motivação 
+
+<p>Pessoalmente sou um grande fã de filmes de terror, filmes que deixam o coração acelerado e principalmente os momentos de tensão que ocorrem antes de uma grande cena, seja um susto ou a aparição do vilão principal.</p>
+<p>Entretanto, mesmo gostando muito, sei que esses filmes sofrem preconceito em relãção ao seus roteiros e principalmente a produção pois, hoje em dia as pessoas que assistem e gostam de filmes estão muito mais críticas a qualidade dos mesmos.</p>
+<p>Surgiu então a principal dúvida em relação a esses filmes: <b>Quão ruim são esses filmes?</b>. Essa pergunta obviamente se refere a parte das notas dadas pelos usuários, e como no laboratório anterior falamos também sobre filmes iremos utilizar os mesmos dados anteriores, e principalmente focar na variável de notas <b>rating</b>.</p>
+
+![](https://media.giphy.com/media/mphIpEZf54wko/giphy.gif)
+
+## Tratamento dos dados
+
+<p>Os dados foram tratados da mesma forma que para o trabalho anterior, só que a manipulação dos dataframes foi diferente para cada uma das perguntas.</p>
+
+```{r}
+
+links <- read.csv("dados/links.csv")
+movies <- read_csv("dados/movies.csv", col_types = cols(genres = col_character()))
+ratings <- read.csv("dados/ratings.csv")
+tags <- read.csv("dados/tags.csv")
+
+
+merged.all.movies <- merge(ratings,movies,by = "movieId")
+
+```
+
+# Filmes que tem os gêneros Horror, Thriller tem geralmente pontuação mais baixa que os outros?
+
+<p>Essa pergunta é a base principal de tudo, o questionamento é contante, se existe realmente essa diferença grande de pontuação entre filmes que são desses gêneros e o resto.</p>
+<p>Faremos isso em duas partes, a primeira usando a biblioteca <b>Rmisc</b> e depois utilizaremos <b>boot</b>(bootstrap) para calcularmos o mesmo intervalo de confiança e fazermos uma comparação.</p>
+
+## Sem bootstrap
+
+<p>Primeiramente usando <b>Rmisc</b> calcularemos o CI para os dois cojuntos de filmes que se encaixam no gênero Horror/Thriller (independentemente da quantidade de gêneros) e o resto dos outros gêneros de filmes, que obrigatoriamente não contêm esses gêneros.</p>
+<p>Podemos ver que a média dos filmes que não contêm Horror ou Thriller nos seus gêneros é consideravelmente maior que dos que contêm, além de ter um intervalo de confiança menor pela quantidade de amostras ser maior</p>
+
+```{r}
+horror <- merged.all.movies[grep("Horror", merged.all.movies$genres), ]
+thriller <- merged.all.movies[grep("Thriller", merged.all.movies$genres), ]
+all.the.rest <- merged.all.movies[!(merged.all.movies$movieId %in% horror$movieId),]
+all.the.rest <- all.the.rest[!(all.the.rest$movieId %in% thriller$movieId),]
+merged.horror.thriller <- rbind(horror,thriller)
+merged.horror.thriller <- merged.horror.thriller[!duplicated(merged.horror.thriller),]
+merged.horror.thriller$category <- "Thriller/Horror"
+all.the.rest$category <- "Resto das categorias" 
+
+teste <- rbind(all.the.rest,merged.horror.thriller)
+teste$category <- as.factor(teste$category)
+teste.summarized <- Rmisc::summarySE(teste, measurevar="rating",groupvars = c("category"))
+print(teste.summarized, row.names = FALSE)
+```
+
+<p>Podemos ver de forma destacada nesse Scatterplot com Errobar, a forma como se comportam essas duas categoria. Notamos aqui que o limite  superior do CI da categoria Horror/Thriller é afastado do limite inferior do CI da outra categoria. O que implica dizer que com 95% de chance uma nota randomica vai ser menor se for dada a um filme Horror/Thriller.</p>
+
+
+```{r}
+pd <- position_dodge(0.1)
+
+ggplot(teste.summarized, aes(x=category, y=rating, colour=category, group = category)) + 
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci), width=.1, position=pd) +
+    geom_point(position=pd) 
+
+```
+
+## Com bootstrap
+
+<p>Tentaremos tirar a prova completa agora com a biblioteca <b>boot</b> que replica a amostra de forma a tentar calcular um CI mais preciso.</p>
+<p>Aqui podemos ver o cálculo para a categoria <b>Resto das categorias</b> e todos os CI foram calculados acima do que o <b>Rmisc</b> calculou, além de ter um quase 3 vezes maior que o do gráfico anterior. Todas as médias foram maiores também.</p>
+
+```{r}
+results <- boot(data=all.the.rest, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+plot(results, index=1)
+boot.ci(results, type="norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+
+
+```
+
+<p>Mesma coisa se aplica para a categoria <b>Horro/Thriller</b>, todas as médias e CI foram maiores do que os calculados pela biblioteca anterior. Entretanto verificamos que o intervalo entre esses dois CI das categorias é praticamente o mesmo que o anterior, havendo apenas um deslocamento do gráfico para cima.</p>
+<p>Concluimos então com 95% de certeza que se existir uma nota para um filme, e esse filme estiver nas categorias Horror ou Thriller, ele vai ter uma nota menor do que se não estivesse.</p>
+
+```{r}
+results <- boot(data=merged.horror.thriller, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+plot(results, index=1)
+boot.ci(results, type="norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+
+```
+
+# Entre os dois qual tem a maior nota? Horror ou Thriller?
+
+<p>Muitas pessoas confundem filmes de Horror com Thriller. Entretanto são coisas diferentes e bem definidas, que suas definições podem ajudar a entendermos os resultados dessa pergunta.</p>
+<p><b>Horror:</b> forte impressão de repulsa ou desagrado, acompanhada ou não de arrepio, gerada pela percepção, intuição, lembrança de algo horrendo, ameaçador, repugnante; pavor.</p>
+<p><b>Thriller:</b> Também pode ser classificado como suspense, é um gênero da literatura, filmes, jogos eletrônicos e televisão que usa o suspense, tensão e excitação como principais elementos do gênero. O seu principal subgênero é o "thriller psicológico".</p>
+<p>Podemos ver que o que muitas pessoas chamam de Terror ou mesmo Horror é na verdade um filme do gênero Thriller e vice-versa. Nesse sentido a ideia dessa pergunta é olhar para dentro desse universo e analisar qual dessas duas categorias tem melhores notas.</p>
+
+
+## Sem bootstrap
+
+<p>Novamente vamos fazer o calculo do CI utilizando a biblioteca <b>Rmisc</b> para cada uma das categorias separadamente.</p>
+<p>Observamos a média bem superior para filmes da categoria <b>Thriller</b>, além de um CI menor, que é consequência , novamente, de uma amostragem maior.</p>
+
+```{r}
+horror.only <- horror[!(horror$movieId %in% thriller$movieId),]
+horror.only$category <- "Horror"
+thriller.only <- thriller[!(thriller$movieId %in% horror$movieId),]
+thriller.only$category <- "Thriller"
+
+merged.only <- rbind(horror.only,thriller.only)
+merged.only.summarized <- Rmisc::summarySE(merged.only, measurevar = "rating", groupvars = c("category"))
+print(merged.only.summarized,row.names=FALSE)
+```
+
+<p>Aqui de forma gráfica podemos ver essa diferença acentuada principalmente entre os limites superior e inferior entre as categorias. Como principalmente a diferença entre as médias.</p>
+
+
+```{r}
+ggplot(merged.only.summarized, aes(x=category, y=rating, fill=category, colour=category)) + 
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9)) +  geom_point(position=pd)
+
+```
+
+## Com bootstrap
+
+<p>Calculando cada categoria separadamente com o <b>bootstrap</b> poderemos ver em melhor precisão se essa diferença é realmente tão acentuada assim, principalemente para o caso da média que era 0.2 de diferença entre as duas categorias.</p>
+<p>Para a primeira categoria de <b>Horror</b> a média permaneceu quase a mesma, entretanto o CI teve uma redução.</p>
+
+```{r}
+results <- boot(data=horror.only, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+
+plot(results, index=1)
+boot.ci(results, type = "norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+```
+
+<p>O mesmo aconteceu para os filmes da categoria <b>Thriller</b>, e assim podemos concluir com o mesmo grau de certeza da questão anterior que os filmes que se encontram na categoria <b>Horror</b> recebem notas menores do que em Thriller. Isso é explicado porque geralmente filmes de horror tem bem mais cenas sangrentas que pessoas de estômago fraco não se dão muito bem e sendo assim dão notas menores por traumatizar ou ter cenas difíceis de esquecer.</p>
+
+
+```{r}
+results <- boot(data=thriller.only, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+
+plot(results, index=1)
+boot.ci(results, type = "norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+```
+
+
+# Dentre eles (Horror e Thriller) os que tem comédia possuem notas maiores?
+
+<p>Outra curiosidade é se o gênero <b>Comedia</b> influencia as notas dos filmes Horror/Thriller. Como experiencia todos os filmes que eu mesmo assisti ou vi críticas, que envolvessem comédia eram piores do que os filmes puramente de Horror ou Thriller.</p>
+<p>Usaremos o mesmo sistema anterior para responder essas questões.</p>
+
+
+## Sem bootstrap
+
+<p>Fazendo os cálculos com <b>Rmisc</b> podemos ver logo a primeira impressão que apesar dos filmes com comédia terem a média menor, a diferença é pequena. A diferença da amostra é realmente notável, e a diferença de CI é quase 3 vezes maior para os filmes que possuem Comédia nos gêneros.</p>
+
+```{r}
+comedy.ones <- merged.horror.thriller[grep("Comedy", merged.horror.thriller$genres), ]
+comedy.ones$category <- "Comedy"
+comedy.less <- merged.horror.thriller[!(merged.horror.thriller$movieId %in% comedy.ones$movieId),]
+comedy.less$category <- "No comedy"
+merged.comedy <- rbind(comedy.less,comedy.ones)
+merged.comedy$category <- as.factor(merged.comedy$category)
+
+merged.comedy.summarized <- Rmisc::summarySE(merged.comedy,measurevar = "rating", groupvars = c("category"))
+print(merged.comedy.summarized, rown.names = FALSE)
+```
+
+<p>Aqui de forma gráfica podemos ver o quão próximo são os limites superior(Comedy) e o inferior(No comedy) das duas categorias. Mas que mesmo assim a média delas está afastada.</p>
+
+
+```{r}
+ggplot(merged.comedy.summarized, aes(x=category, y=rating, color = category)) + 
+    geom_errorbar(aes(ymin=rating-ci, ymax=rating+ci),
+                  width=.2,                    # Width of the error bars
+                  position=position_dodge(.9)) + geom_point(position = pd)
+
+```
+
+## Com bootstrap
+
+<p>Usando o <b>bootstrap</b> vemos que para os filmes que tem comédia dentre seus gêneros a média subiu 0.02 pontos, mas o CI continuou o mesmo.</p>
+
+```{r}
+results <- boot(data=comedy.ones, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+
+plot(results, index=1)
+boot.ci(results, type = "norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+```
+
+<p>Já para os filmes que não contem o gênero comédia a média aumentou em 0.03 pontos, e o intervalo de confiança aumentou somente 0.002. Assim não contendo uma alteração significativa podemos concluir que os filmes que contêm comédia recebem notas mais baixas do que os que não contêm.</p>
+
+```{r}
+results <- boot(data=comedy.less, statistic=bs, 
+                R=100, formula=rating~movieId)
+
+
+plot(results, index=1)
+boot.ci(results, type = "norm")
+boot.ci(results, type = "basic")
+boot.ci(results, type = "perc")
+```
