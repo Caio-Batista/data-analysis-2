@@ -1,0 +1,167 @@
+---
+title: "Lab 1 - Checkpoint 4 -  Relatório Final"
+author: "Caio Oliveira"
+date: "April 2, 2018"
+output:
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+# Trabalho inicial
+<p>Neste trabalho usamos dos mesmos [dados](https://github.com/nazareno/travistorrent-eda/blob/master/data/projetos.csv) do <b>Checkpoint 2</b> para respondermos através de visualizações à duas perguntas as quais formulamos no <b>Checkpoint 3</b> e assumimos hipóteses para cada uma delas.</p>
+
+....
+
+## Tratamento dos dados
+
+<p>Note que nesse laboratório as duas variáveis <b>team</b> e <b>activity_period</b> foram sumarizadas, a fim de termos visualizações mais enxutas e de mais fácil compreensão.</p>
+<p>A sumarização foi feita em intervalos de 10 unidades, partindo do 0 até 50 e após isso todos os dados restantes foram agregados a um mesmo intervalo, pela pouca quantidade de amostras.</p>
+
+<p>Nas duas variáveis foi utilizada a <b>Mediana</b> para o estudo comparativo.</p>
+
+
+```{r setup, message=FALSE, results='hide'}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(plotly)
+library(knitr)
+
+data <- read.csv("data/projetos.csv")
+```
+
+
+## Como se comporta a proporção de builds de sucesso do Travis em relação a quantidade de pessoas nas equipes?
+<p><b>Hipótese:</b> Acredito que com mais pessoas mexendo no código a tendencia de introduzir bugs é maior e os builds de sucesso passariam a ser menos recorrentes.</p>
+<p><b>Metodologia utilizada:</b> Para responder essa questão a primeira coisa a ser feita foi criar um gráfico de dispersão e nele ainda criar uma linha de regressão linear, tentando assim entender o comportamento dos dados e se forem realmente como a hipótese o gráfico vai mostrar uma linha decrescente conforme o eixo x aumenta.</p> 
+
+```{r}
+kable(data[1:5,1:8], caption="Recorte dos dados")
+
+```
+
+<p>Entretanto quando olhamos para este gráfico de dispersão não temos uma ideia clara do comportamento dessa linha. Apenas temos noção da concentração de dados.</p>
+<p>Para resolver esse problema da visualização poderiamos mudar a escala dos eixos x e y, ou poderíamos dividir os dados da quantidade de pessoas por time em intervalos definidos.</p>
+
+```{r}
+
+ggplot(data, aes(x=build_success_prop, y=team)) + 
+  geom_point() +
+  geom_smooth(method=lm)
+
+```
+
+<p>Para este problema a segunda solução foi utilizada, e tentando entender um pouco mais sobre a variação dos dados utilizei o gráfico de <b>Boxplot</b> dividido por intervalo de time. E logo notamos que a faixa 41-50 tem a maior variância.</p>
+<p>Apesar da boa visualização de como se concentram os dados e seus quartis, essa visualização não responde a pergunta com facilidade.</p>
+
+```{r}
+data$team_section <-ifelse(data$team <= 10,"0-10", 
+                         ifelse(data$team <= 20,"11-20",
+                                ifelse(data$team <= 30,"21-30",
+                                       ifelse(data$team <= 40,"31-40",
+                                              ifelse(data$team <= 50,"41-50",
+                                                     ifelse(data$team > 50, "50+","50+"))))))
+
+
+p <- ggplot(data, aes(x=team_section,group = team_section, y=build_success_prop)) + 
+  geom_boxplot() 
+p
+
+```
+
+<p>Tendo em vista como visualização auxiliar e de forma mais fácil aqui temos um gráfico simples de pontos, divididos pelos mesmos intervalos de antes, só que agora cada um desses pontos representa a mediana dos dados naquele intervalo.</p>
+<p>Não utilizei aqui a média pois os dados contém valores extremos que afetariam a média.</p>
+<p>Aqui podemos perceber, se o ultimo intervalo for desconsiderado, um comportamento semelhamte a uma parábola, que após seu valor máximo no intervalo 21-30  decresce de forma drástica a proporção de sucessos nos builds para essa quantidade de pessoas no time.</p>
+```{r}
+
+ggplot(data, aes(x=team_section, y=build_success_prop, group=1)) +
+geom_point(stat='summary', fun.y=median) +
+stat_summary(fun.y=median, geom="line")
+
+
+```
+
+<p><b>Conclusão:</b> Não podemos afirmar com certeza que esse comportamento tem uma relação linear para os dados que temos, mas o gráfico sugere algum tipo de relação quadrática. O que nos intriga a pensar se esse comportamento tambem se nota em uma quantidade maior de projetos no github e se ainda, esse comportamento se repete para determinados intervalos de times. Um pensamento interessante de se ter com essa visualização é se, por exemplo, a mediana sobe novamente para depois descer, tendo assim um comportamento <b>Bimodal</b>.</p>
+
+
+
+### Pergunta derivada: Qual linguagem de programação é mais presente nesse pico de builds de sucesso?
+
+<p>A pergunta que se derivou desse estudo foi devida suspeita de que esses builds de sucesso no intervalo de pico seria devido a grande quantidade de projetos <b>Java</b>, linguagem a qual é fortemente tipada (diminui os erros de compilação em muitos IDE's) e que ajudaria as pessoas a cometerem menos erros com mais pessoas revisando e trabalhando nesses projetos. Além de ser mais popular que <b>Ruby</b>.</p>
+<p>A forma mais direta de verificarmos a resposta para essa pergunta é a filtragem dos dados para o intervalo em questão e um agrupamento por linguagem. Utilizando um <b>Barplot</b>.</p>
+
+```{r}
+data_filtered <- data %>%
+  filter(team_section == "21-30")
+
+
+g <- ggplot(data_filtered, aes(lang))
+g + geom_bar()
+```
+
+<p><b>Conclusão:</b> A suposição de que a linguagem Java era a predominante estava equivocada e Ruby tem a maior proporção de sucessos por build para essa quantidade de pessoas no time. Esse tipo de visualização também levanta suspeitas se os dados utilizados estão desbalanceados para as linguagens de programação, e ainda nos faz contestar se Ruby é mesmo uma linguagem popular ou não no github.</p>
+
+....
+
+
+## Existe alguma relação entre os tempos de duração e a quantidade de testes?
+
+<p><b>Hipótese:</b>  Com o passar do tempo também projetos começam a adicionar testes, e acho que dá para detectar essa relação diretamente proporcional.</p>
+<p><b>Metodologia utilizada:</b> Nesse caso as variáveis que utilizaremos para responder a pergunta são <b>activity_period</b> e <b>tests_per_kloc</b>.</p>
+<p>Do mesmo modo que para a pergunta anterior, iremos utilizar aqui um <b>Scatterplot</b> (gráfico de dispersão) conjuntamente com uma regressão linear para sabermos se os dados são bem comportados e expressão qualquer tipo de relação linear facilmente detectável.</p>
+<p>Entretanto, também semelhante aos dados da questão anterior, esse tipo de gráfico não nos dá a noção certa para responder a pergunta proposta.</p>
+<p>Utilizando-se novamente de intervalos para o tempo de duração dos projetos, vamos fazer outras análises baseadas em diferentes visualizações.</p>
+
+```{r, warning=FALSE}
+
+
+ggplot(data, aes(x=activity_period, y=tests_per_kloc)) + 
+  geom_point() +
+  geom_smooth(method=lm)
+
+```
+
+<p>Divididos nos intervalos de duração de projeto, da mesma forma e na mesma medida que a divisão anterior, esse <b>Boxplot</b> já nos dá uma noção clara de que quanto mais tempo o projeto fica ativo a variância dos dados tendem a diminuir e seus quartis a se aproximarem.</p>
+<p>Além disso notamos uma tendência de crescimento conforme os valores do eixo x aumentam.</p>
+
+```{r, warning=FALSE}
+
+data$activity_section <-ifelse(data$activity_period <= 10,"0-10", 
+                         ifelse(data$activity_period <= 20,"11-20",
+                                ifelse(data$activity_period <= 30,"21-30",
+                                       ifelse(data$activity_period <= 40,"31-40",
+                                              ifelse(data$activity_period <= 50,"41-50",
+                                                     ifelse(data$activity_period > 50, "50+","50+"))))))
+
+
+p <- ggplot(data, aes(x=activity_section, y=tests_per_kloc,group = activity_section)) + 
+  geom_boxplot() + scale_y_log10()
+p
+```
+
+<p>Entrentanto para que fique mais fácil de visualizar esse crescimento, faremos o mesmo gráfico de pontos interligados que para a questão anterior. E logo percebemos esse crescimento predominante após uma queda do primeiro intervalo para o segundo.</p>
+<p>Novamente aqui utilza-se a mediana para os intervalos e não a média.</p>
+
+```{r}
+
+ggplot(data, aes(x=activity_section, y=tests_per_kloc, group=1)) +
+geom_point(stat='summary', fun.y=median) +
+stat_summary(fun.y=median, geom="line")
+
+
+```
+
+<p><b>Conclusão:</b> Podemos perceber um comportamento quase linear de crescimento e concluir, apesar do primeiro declive, que projetos com mais tempo em atividade tem mais testes. Apesar de parecer óbvio que com o passar do tempo os projetos necessitam de mais testes, existem muitos projetos grandes na indústria que tem anos de produção e não tem tantos testes quanto deveriam. O que não parece ser o caso para os dados que temos do github.</p>
+
+### Pergunta derivada: Qual linguagem tem mais testes por linha de código?
+
+<p>A indagação sobre a quantidade de testes também levantou a suspeita de que uma linguagem específica, <b>Java</b>, teria mais linhas de teste já que tem uma biblioteca muito famosa para testes automáticos, além de geração de testes automáticos a partir do código.</p>
+<p>Novamente a forma mais direta de conclusão se baseia no estudo de um <b>Barplot</b> no qual é relacionado as linguagens de programação pelo número de linhas de teste em todos os projetos.</p>
+
+```{r}
+g <- ggplot(data, aes(x=lang,y=tests_per_kloc)) 
+g + geom_bar(stat='summary', fun.y=median)
+```
+
+<p><b>Conclusão:</b> A suposição novamente estava equivocada e podemos concluir que Ruby é a linguagem predominante no que concerne a projetos com mais linhas de teste. E nesse caso, ainda mais que no da questão derivada anterior, Ruby se sobresai de forma notável sobre as outras duas linguagens, de forma que podemos pensar que, por exemplo, para codificar um caso de teste em Ruby requer muito mais linhas do que para Java. </p>

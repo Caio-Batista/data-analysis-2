@@ -1,0 +1,142 @@
+---
+title: "Lab 1 - Checkpoint 2 - Minhas perguntas"
+author: "Caio Oliveira"
+date: "March 26, 2018"
+output:
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+# Introdução
+
+<p></p>
+
+<p>A ideia desse laboratório, para a disciplina de <b>FPCC2</b>, é fazer nos familiarizarmos mais com variáveis de um dataset qualquer e aprender a responder de forma gráfica, e simples, à perguntas sobre os [dados](https://github.com/nazareno/travistorrent-eda/blob/master/data/projetos.csv) em questão.</p>
+
+....
+
+
+
+
+# 1- Como são os tamanhos de time nos projetos que usam travis em Java e em Ruby nos nossos dados? 
+
+<p>Primeiramente para respondermos essa pergunta temos que nos livrar dos dados indesejados. No caso todos aqueles que não correspondem o <b>lang</b> com <i>Java</i> ou <i>Ruby</i>.</p> 
+<p>Após fazer isso temos um recorte dos dados abaixo, para saber como ele se comporta e principalmente suas <i>features</i>, as quais iremos selecionar aqui neste notebook para responder as perguntas propostas pelo professor.</p>
+<p>A ideia inicial para respoder essa pergunta é ver qual a proporção de equipes em relação a cada uma das duas linguagens e observarmos também principalmente a distribuição dos dados em relação a quantidade de membros em um time por linguagem.</p>
+
+```{r setup, message=FALSE, results='hide'}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(plotly)
+library(knitr)
+
+data <- read.csv("data/projetos.csv")
+```
+
+
+
+```{r}
+data_filtered <- data  %>%
+                 filter(lang == "java" | lang == "ruby")
+kable(data_filtered[1:5,1:8], caption="Recorte dos dados filtrados")
+```
+
+
+<p>A melhor maneira de vermos a dispersão dos dados de uma forma intuitiva é usando o <b>violin plot</b>. Essa ferramenta nos dá a possibilidade de vermos rapidamente onde se concentram os dados e se são uniformemente distribuidos. Faremos esse gráfico com as variáveis da quantidade de membros de um time (<b>team</b>) e agrupados por linguagem.</p>
+<p>Entretanto para esses dados essa visualização,  sem nenhuma normalização, não irá nos ajudar a obter a resposta para a pergunta. Os dados tem uma diferença muito grande entre si, e para podermos visualizar melhor iremos aplicar a seguir. </p>
+```{r, warning=FALSE}
+p <- ggplot(data_filtered, aes(x=lang, y=team)) + 
+  geom_violin()  + geom_jitter(shape=20, position=position_jitter(0.3))
+p
+  
+```
+
+
+<p>Agora o gráfico ficou bem mais intuitivo, e podemos ver que apesar da concentração maior de dados para a linguagem <i>Ruby</i>, as duas distribuições são bem parecidas, concentrando os dados abaixo de 50 pessoas por time.</p>
+```{r, warning=FALSE}
+p <- ggplot(data_filtered, aes(x=lang, y=team)) + 
+  geom_violin() + scale_y_log10() + geom_jitter(shape=20, position=position_jitter(0.3))
+p
+  
+```
+
+<p>Essa mesma visualização do <b>violin plot</b> pode ser vista com outra ferramenta integrada a ela, que é o <b>boxplot</b>. Esse tipo de gráfico nos mostra mesma coisa que o anterior mas de uma forma resumida e menos poluida visualmente. </p>
+
+
+```{r, warning=FALSE}
+p <- ggplot(data_filtered, aes(x=lang, y=team)) + 
+  geom_violin() + scale_y_log10() + geom_boxplot(width=0.1)
+p
+```
+
+<p>Talvez uma das coisas mais importantes quando mexemos com um dataset é verificarmos se nossos dados são balanceados, pois esse procedimento pode nos ajudar bastante na escolha, por exemplo, de algoritmos de aprendizagem de máquina.</p>
+<p>Para esse notebook a intenção de vermos a diferença nos dados é só para sabermos se a quantidade de times tem relação direta com o tamanho dos mesmos nos projetos.</p>
+<p>Aqui podemos ver que os dados são desbalanceados em relação a linguagem <i>Ruby</i> que possui mais que o dobro de projetos em relação a <i>Java</i>.</p>
+```{r}
+p <- plot_ly(data_filtered,y = ~lang, type = "histogram")
+p
+```
+
+<p>Por fim podemos comparar no mesmo gráfico os dois histogramas, um para cada linguagem, em relação a frequência na quantidade de membros em um time. </p>
+<p>Para melhor visualização este gráfico é interativo e pode-se aproximar de uma determinada faixa do eixo x e y.</p>
+<p>Com esse gráfico concluimos que para a linguagem <i>Ruby</i> a frequência de times é bem maior que para <i>Java</i> na mesma quantidade de integrantes.</p>
+```{r}
+java <- data_filtered %>%
+        filter(lang == "java")
+
+ruby <- data_filtered %>%
+        filter(lang == "ruby")
+
+s <- seq(1, 50, by = 0.12)
+p <- plot_ly(alpha = 0.6) %>%
+  add_histogram(data=java, y = ~team, name = "Java") %>%
+  add_histogram(data=ruby, y = ~team, name= "Ruby") %>%
+  layout(barmode = "overlay")
+p
+```
+
+# 2- Ao comparar projetos em Java e em Ruby que tenham ao menos 10 contribuidores no time nos nossos dados, projetos de qual linguagem variam mais na proporção de builds cujo resultado é sucesso? 
+
+<p>Para respondermos essa pergunta não podemos continuar utilizando os mesmos dados de antes. Uma nova filtragem é necessária tendo como pivot agora a <i>feature</i> <b>team</b> maior ou igual a 10.</p>
+<p>Podemos ver a seguir como os dados ficaram em outro recorte para análise e que na qual nessa sessão focaremos todas as análises com a coluna <b>build_success_prop</b>.</p>
+
+
+```{r}
+data_plus_ten <- data_filtered %>%
+                 filter(team  >= 10)
+kable(data_plus_ten[1:5,1:8],caption = "Dados com mais de 10 na equipe")
+
+```
+
+
+
+<p>Sempre que falamos de variação em dados, o <b>Boxplot</b> é sempre uma forma segura de verificarmos essa características conjuntamente a outras.</p>
+<p>Para este caso o <b>violin plot</b> adicionado ao <b>Boxplot</b> nos dá a noção de variação + distribuição. O que podemos ver aqui que apesar de similares, essas duas distribuições tem diferenças sutis. </p>
+<p>Para <i>Ruby</i> a distribuição parece se concentrar mais próximo do 1 que para <i>Java</i>.</p>
+```{r}
+p <- ggplot(data_plus_ten, aes(x=lang, y=build_success_prop)) + 
+  geom_violin()  + geom_boxplot(width=0.1)
+p
+```
+
+<p>Agora fazendo essa mesma visualização mas com o gráfico de dispersão ao invés do <b>boxplot</b> podemos confirmar a quantidade de dados se concentrando acima para linguagem <i>Ruby</i>.</p>
+```{r, warning=FALSE}
+p <- ggplot(data_plus_ten, aes(x=lang, y=build_success_prop)) + 
+  geom_violin()  + geom_jitter(shape=20, position=position_jitter(0.3))
+p
+  
+```
+
+
+<p>Por fim, o <b>Boxplot</b> de forma interativa nos mostra que <i>Java</i> tem uma variação maior em relação a quantidade de builds proporcionais.</p>
+
+
+```{r}
+p <- plot_ly(data=data_plus_ten, x = ~lang,y = ~build_success_prop, type = "box") 
+p
+```
+
+
+
