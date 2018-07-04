@@ -55,18 +55,21 @@ ggplot(data, aes(x=build_success_prop, y=team)) +
 <p>Para este problema a segunda solução foi utilizada, e tentando entender um pouco mais sobre a variação dos dados utilizei o gráfico de <b>Boxplot</b> dividido por intervalo de time. E logo notamos que a faixa 41-50 tem a maior variância.</p>
 <p>Apesar da boa visualização de como se concentram os dados e seus quartis, essa visualização não responde a pergunta com facilidade.</p>
 
-```{r}
-data$team_section <-ifelse(data$team <= 10,"0-10", 
-                         ifelse(data$team <= 20,"11-20",
-                                ifelse(data$team <= 30,"21-30",
-                                       ifelse(data$team <= 40,"31-40",
-                                              ifelse(data$team <= 50,"41-50",
+```{r, warning=FALSE}
+data$team_section <-ifelse(data$team <= 10,"0/10", 
+                         ifelse(data$team <= 20,"11/20",
+                                ifelse(data$team <= 30,"21/30",
+                                       ifelse(data$team <= 40,"31/40",
+                                              ifelse(data$team <= 50,"41/50",
                                                      ifelse(data$team > 50, "50+","50+"))))))
 
 
-p <- ggplot(data, aes(x=team_section,group = team_section, y=build_success_prop)) + 
-  geom_boxplot() 
-p
+ggplot(data, aes(x=team_section, y=tests_per_kloc)) + scale_y_log10() +
+  geom_boxplot(aes(fill=lang, text="a")) + labs(x = "Qtd Pessoas no projeto", y = "Testes (mil linhas codigo)", fill = "Linguagem\n") +
+theme(axis.text=element_text(size=22),
+        axis.title=element_text(size=22,face="bold"),
+         legend.title = element_text(size=22),legend.text = element_text(size=20))
+ggsave("teste1.pdf", width = 9, height = 9)
 
 ```
 

@@ -1,0 +1,116 @@
+---
+title: "Lab 2 - Checkpoint 1"
+author: "Caio Oliveira"
+date: "April 12, 2018"
+output:
+ html_document:
+  toc: true
+  toc_float: true
+---
+
+## Introdução 
+<p><b>Variáves:</b> team, lang, num_commits, tests_per_kloc.</p>
+<p>Esse checkpoint desse laboratório tem como objetivo exercitar o trabalho de diferentes visualizalções para as mesmas variáveis em questão. No caso deste trabalho, as variáveis iniciais citadas acima, foram filtradas do [dataframe](https://github.com/nazareno/travistorrent-eda/blob/master/data/projetos.csv) original, principalmente para facilitar a visualização dos valores de cada coluna e evitar uma possível poluição visual ou confusão de variáveis.</p>
+<p>Para cada uma da visualizações a motivação vai estar descrita e detalhada a escolha de cada elemento para a discussão</p>
+
+```{r setup, message=FALSE, results='hide'}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(plotly)
+library(knitr)
+
+data1 <- read.csv("data/projetos.csv")
+```
+
+```{r}
+x <- c("team", "lang", "num_commits","tests_per_kloc")
+data <- data.frame(data1$team, data1$lang, data1$num_commits,data1$tests_per_kloc)
+colnames(data) <- x
+kable(data[1:5,], caption="Recorte dos dados")
+```
+
+
+## Primeira visualização
+<p><b>Motivação:</b> Esta visualização tem como principal objetivo evidenciar a resposta do questionamento: O número de commits pode nos dizer algo sobre a quantidade de testes nos projetos?</p>
+<p>Esta pergunta é respondida com esta visualizaçãom, utilizando um gráfico de dispersão para as primeiras duas variáveis em questão e depois dividindo esse questionmento por linguagem. Além disso a quantide de pessoas no time parece estar relacionada de alguma forma com a quantidade de commits. Como podemos ver os pontos tendem a clarear conforme vão subindo no eixo y.</p>
+<p>A resposta do questionamento para a visualização é que nâo podemos achar um tipo de relação, seja ela linear ou quadrática, que explique essa relação para qualquer uma das linguagens em questão nos dados.</p>
+
+```{r}
+ggplot(data, aes(x=tests_per_kloc, y=num_commits, color=team)) +
+  geom_point() + 
+  scale_y_log10() +
+  facet_grid(. ~ lang) 
+```
+
+## Segunda visualização
+
+<p><b>Motivação:</b> Para a segunda visualização a pergunta que podemos responder a partir dela é: Em média os testes crescem conforme a quantidade de pessoas no time aumenta? E o número de commits acompanha essa relação?</p>
+<p>Novamente aqui foi feita a separação por tipo de linguagem do projeto, que nos ajuda a observar se isso é uma tendência de uma linguagem apenas ou não.</p>
+<p>Nesta visualização o número de commits é usado para dar o tamanho do ponto entre a quantidade de pessoas e as linhas de testes (a cada mil), essa marca foi utilizada para reconhecer o padrão de crescimento mais facilmente. Entretanto como podemos observar na visualização, nenhuma das linguagens tem dados expressivos dessa relação direta, nem mesmo inversa. Portanto não podemos concluir que a quantidade de pessoas influencia diretamente nas quantidades de testes a cada mil linhas de código.</p>
+
+
+```{r, warning=FALSE}
+g <- ggplot(na.omit(data), aes(y=tests_per_kloc, x=team))
+g  + geom_point(stat='summary', fun.y=mean, aes(size=num_commits)) + facet_grid(. ~ lang) 
+```
+
+
+## Terceira visualização
+<p><b>Motivação:</b> Para esta visualização a pergunta foi simples e direta, derivada da pergunta anterior: Como se distribuem esses dados de quantidade de pessoas e testes nos projetos com menos de 50 pessoas?</p>
+<p>A filtragemn inicial para a quantidade de pessoas foi devido ao estudo do laboratório anterior, no qual podemos perceber que os dados eram concentrados nos projetos com menos de 50 pessoas. Então para ajudar na visualização a filtragem foi feita.</p>
+<p>As duas melhores formas de vermos a distribuição e variação dos dados é usando Boxplots e Violin plots, logo para essa visualização para cada uma das linguagens foi feito o Boxplot e o Violin plot do conjunto de dados para todos os times com quantidade menor ou igual a 50.</p>
+<p>Respondendo a pergunta podemos de cara ver que para a linguagem <b>Javascript</b>, que tem uma quantidade baixa de projetos associados, e os gráficos associados a essa linguagem são bem reduzidos e por tanto não tem uma distribuição ou variação considerável. Já para <b>Java</b>, podemos ver que é mais bem distribuido que para <b>Ruby</b>, e sua mediana se concentra pouco acima de 50, já para <b>Ruby</b>, sua mediana fica em torno de 100 e a sua distribuição é mais concentrada, inclusive acima do terceiro quartil dos gráficos de <b>Java</b>.</p>
+
+
+```{r, warning=FALSE}
+
+ggplot(filter(data,team <= 50), aes(x=team, y=tests_per_kloc, color=team))+
+  geom_violin(width=0.01) + 
+  geom_boxplot(width=0.01) +   
+  scale_y_log10() + 
+  facet_grid(. ~ lang) 
+```
+
+
+## Quarta visualização
+
+<p><b>Motivação:</b> Esta pergunta também se derivou da segunda mas em vez de usarmos as médias, o que aconteceria se usarmos os dados puros?</p>
+<p>Neste caso a mesma variável do número de commits é usada para diferenciar a cor nos pontos e ainda seu tamanho, facilitando a visualização ainda mais que na visualização dois que é monocromática.</p>
+<p>Para essa pergunta usamos de novo o gráfico de dispersão, com as mesmas duas variáveis anteriores, quantidade de pessoas num time e a quantidade de testes a cada mil linhas de código, para cada uma das linguagens de programação presentes nos dados.</p>
+<p>Como esperado para reposta dessa pergunta também não podemos detectar qualquer padrão ou comportamento relacional entre as variáveis além de que conforme a quantidade de pessoas no time cresce a quantidade de commits também cresce, que já foi observado antes.</p>
+
+```{r, warning=FALSE}
+ggplot(filter(data,team <= 10), aes(x=team, y=tests_per_kloc, group = team,color=num_commits))+
+  geom_point(aes(size=num_commits)) +
+  scale_y_log10() +
+  facet_grid(. ~ lang) + 
+  geom_smooth(method=lm)
+```
+
+
+## Quinta visualização
+
+<p><b>Motivação:</b> Esta é uma visualização integrada das variáveis de lingaugem e basicamente responde a uma questão parecida com a segunda visualização: Como se comportam as medianas da quantidade de testes por mil linhas de código, para cada linguagem, em relação a quantidade de pessoas no time? utilizando um gráfico só.</p>
+<p>Nesse caso ao invés da média aqui foi utilizada a mediana, que é uma medida que não se altera com outliers. Além disso o númedo de commits foi utilizado da mesma forma que anteriormente para aumentar o tamanho do ponto cartesiano conforme a quantidade aumenta de commits. Cada uma das medianas foi interligada, dando assim a sensação de uma linha contínua . PAra cada linguagem existe uma linha diferente e de uma coloração diferente também para uma visualização mais fácil.</p>
+<p>A resposta para essa pergunta é podemos ver que quase todas as medianas para a linguagem  <b>Ruby</b> estão acima das demais, e que o número de commits é bem maior que na maioria dos projetos para as outras duas linguagens. As outras duas linguagens tem medianas muito próximas e bem restritas ao começo do eixo x.</p>
+
+```{r, warning=FALSE}
+ggplot(data, aes(x=team, y=tests_per_kloc, group=lang, color=lang)) +
+geom_point(stat='summary', fun.y=median, aes(size=num_commits)) +
+stat_summary(fun.y=median, geom="line")  
+
+```
+
+
+## Sexta visualização
+
+
+<p><b>Motivação: </b>essa visualização teve a motivação de perceber como se comportam as variáveis juntas, sendo diferenciadas apenas pela cor e forma, quanto a linguagem na qual o projeto foi escrito. Aqui mais uma vez os eixos x e y são os mesmos. </p>
+<p>Esta visualização é parecida com a quarta, com as diferenças que, dessa vez os dados não foram filtrados, todas as linguagens estão no mesmo gráfico e são diferenciadas pelas cores e pelas formas. </p>
+<p>A principal relevancia dessa visualização é ver como são os formatos de dados entre as linguagens, e podemos observar que para a linguagem <b>Java</b> tem os dados concentrados formando uma espécie de triângulo, com a base compreendendo entre 100  e pouco abaixo de 1 e com vetice aproximadamente na coordenada (60,100). Outro ponto interessante de se observar é que próximo de 50 no eixo x, ou seja, quando a quantidade de pessoas no projeto se aproxima de 50, os números de commits tem um acrescimo considerável, mas não ocorre o mesmo com os testes.  E ainda assim não podemos dizer nada da forma dos dados para a linguagem  <b>Ruby</b>.</p>
+```{r, warning= FALSE}
+ggplot(data, aes(x=team, y=tests_per_kloc, color=lang)) +
+geom_point(aes(size=num_commits, shape=lang)) + scale_y_log10() 
+```
+
